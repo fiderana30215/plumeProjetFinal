@@ -6,6 +6,9 @@
     "extra": {
       "supabaseUrl": "https://aokixfzzocxhkrkpszax.supabase.co",
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFva2l4Znp6b2N4aGtya3BzemF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0NTU5OTIsImV4cCI6MjA5NzAzMTk5Mn0.5ZnCJcOTLlnN9ZFHaGtMZdCOLLEYA8eHkEPc_EbMLNE"
-    }
+    },
+    "plugins": [
+      "expo-router"
+    ]
   }
 }

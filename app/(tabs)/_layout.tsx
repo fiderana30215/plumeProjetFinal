@@ -1,18 +1,21 @@
 import { Tabs } from 'expo-router'
+import { color } from '../../constants/theme'
 
 export default function TabLayout() {
   return (
     <Tabs screenOptions={{
       headerShown: false,
-      tabBarActiveTintColor: '#6B3FA0',
+      tabBarActiveTintColor: color.ember,
+      tabBarInactiveTintColor: color.faint,
       tabBarStyle: {
-        backgroundColor: '#FFF8F0',
-        borderTopColor: '#DDD0E8',
+        backgroundColor: color.void,
+        borderTopColor: color.border,
+        borderTopWidth: 1,
       },
     }}>
       <Tabs.Screen name="feed" options={{ title: 'Histoires', tabBarIcon: () => null }} />
       <Tabs.Screen name="create" options={{ title: 'Créer', tabBarIcon: () => null }} />
-        <Tabs.Screen name="profile" options={{ title: 'Profil', tabBarIcon: () => null }} />
+      <Tabs.Screen name="profile" options={{ title: 'Profil', tabBarIcon: () => null }} />
     </Tabs>
   )
 }

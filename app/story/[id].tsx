@@ -1,23 +1,31 @@
 import {
-  View, Text, ScrollView, TextInput, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Alert, Platform, KeyboardAvoidingView,
+  View, Text, TextInput, TouchableOpacity,
+  StyleSheet, Alert, Platform,
+  KeyboardAvoidingView, Animated,
 } from 'react-native'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLocalSearchParams, router } from 'expo-router'
-import Animated, {
-  useSharedValue, useAnimatedStyle, withSpring,
-  FadeInDown,
-} from 'react-native-reanimated'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/useAuth'
 import { sendLocalNotification } from '../../lib/useNotifications'
 import LoadingScreen from '../../components/LoadingScreen'
+import Screen from '../../components/Screen'
+import Spinner from '../../components/Spinner'
 import type { StoryRow, ContributionRow } from '../../types/database'
+import { color, font, radius, shared } from '../../constants/theme'
 
 type Tab = 'story' | 'propose' | 'vote'
 
 export default function StoryScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const params = useLocalSearchParams<{ id?: string }>()
+
+  // Sur web, l'id peut venir des params OU de l'URL directement
+  const rawId = (params?.id as string) || ''
+  const urlId = typeof window !== 'undefined'
+    ? window.location?.pathname?.split('/story/')?.[1]?.split('?')?.[0] || ''
+    : ''
+  const id = (rawId && rawId !== 'undefined') ? rawId : urlId
+
   const { userId } = useAuth()
 
   const [story, setStory] = useState<StoryRow | null>(null)
@@ -30,27 +38,34 @@ export default function StoryScreen() {
   const [myVote, setMyVote] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('story')
 
-  const scale = useSharedValue(1)
-  const animatedBtnStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }]
-  }))
+  const scaleAnim = useRef(new Animated.Value(1)).current
+  const fadeAnim  = useRef(new Animated.Value(0)).current
+
+  useEffect(() => {
+    fadeAnim.setValue(0)
+    Animated.timing(fadeAnim, {
+      toValue: 1, duration: 400, useNativeDriver: false,
+    }).start()
+  }, [tab])
 
   async function fetchAll() {
+    if (!id) return
+
     const { data: storyData } = await supabase
       .from('stories').select('*').eq('id', id).single()
-    if (storyData) setStory(storyData)
+    if (storyData) setStory(storyData as StoryRow)
 
     const { data: canonData } = await supabase
       .from('contributions').select('*')
       .eq('story_id', id).eq('is_canon', true)
       .order('turn_number', { ascending: true })
-    if (canonData) setContributions(canonData)
+    if (canonData) setContributions(canonData as ContributionRow[])
 
     const { data: proposalData } = await supabase
       .from('contributions').select('*')
       .eq('story_id', id).eq('is_canon', false)
       .order('vote_count', { ascending: false })
-    if (proposalData) setProposals(proposalData)
+    if (proposalData) setProposals(proposalData as ContributionRow[])
 
     if (userId && storyData) {
       const { data: voteData } = await (supabase
@@ -66,6 +81,10 @@ export default function StoryScreen() {
   }
 
   useEffect(() => {
+    if (!id) {
+      setLoading(false)
+      return
+    }
     fetchAll()
 
     const channel = supabase
@@ -82,6 +101,14 @@ export default function StoryScreen() {
 
     return () => { supabase.removeChannel(channel) }
   }, [id])
+
+  function animateAndVote(contributionId: string) {
+    Animated.sequence([
+      Animated.timing(scaleAnim, { toValue: 0.95, duration: 100, useNativeDriver: false }),
+      Animated.timing(scaleAnim, { toValue: 1, duration: 100, useNativeDriver: false }),
+    ]).start()
+    handleVote(contributionId)
+  }
 
   async function handleSubmit() {
     if (!newParagraph.trim()) {
@@ -102,7 +129,10 @@ export default function StoryScreen() {
     if (error) { Alert.alert('Erreur', error.message); return }
 
     setNewParagraph('')
-    await sendLocalNotification('Paragraphe proposé 🪶', 'Ta proposition a été soumise au vote !')
+    await sendLocalNotification(
+      'Paragraphe proposé 🪶',
+      'Ta proposition a été soumise au vote !'
+    )
     Alert.alert('Proposé ! 🪶', 'Ton paragraphe a été soumis.', [
       { text: 'Voir les votes', onPress: () => setTab('vote') }
     ])
@@ -115,10 +145,6 @@ export default function StoryScreen() {
       return
     }
 
-    scale.value = withSpring(0.95, {}, () => {
-      scale.value = withSpring(1)
-    })
-
     setVoting(contributionId)
     const { error } = await supabase.from('votes').insert([{
       contribution_id: contributionId,
@@ -128,11 +154,14 @@ export default function StoryScreen() {
     }] as any)
 
     if (!error) {
-      await supabase.from('contributions')
-        .update({ vote_count: (proposals.find(p => p.id === contributionId)?.vote_count ?? 0) + 1 } as any)
+      await (supabase.from('contributions') as any)
+        .update({ vote_count: (proposals.find(p => p.id === contributionId)?.vote_count ?? 0) + 1 })
         .eq('id', contributionId)
       setMyVote(contributionId)
-      await sendLocalNotification('Vote enregistré ✅', 'Ton vote a bien été pris en compte.')
+      await sendLocalNotification(
+        'Vote enregistré ✅',
+        'Ton vote a bien été pris en compte.'
+      )
     } else {
       Alert.alert('Erreur', error.message)
     }
@@ -145,129 +174,135 @@ export default function StoryScreen() {
 
   if (!story) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.muted}>Histoire introuvable.</Text>
-      </View>
+      <Screen>
+        <View style={styles.centered}>
+          <Text style={styles.muted}>Histoire introuvable. (id: {id || 'vide'})</Text>
+          <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 16 }}>
+            <Text style={{ color: color.ember }}>← Retour</Text>
+          </TouchableOpacity>
+        </View>
+      </Screen>
     )
   }
 
   const totalVotes = proposals.reduce((sum, p) => sum + p.vote_count, 0)
 
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.back}>← Retour</Text>
-        </TouchableOpacity>
-        <Text style={styles.title} numberOfLines={1}>{story.title}</Text>
-        <Text style={styles.meta}>
-          Tour {story.current_turn}/{story.max_turns} · {story.mode === 'blind' ? '🙈 Aveugle' : '👁 Tout voir'}
-        </Text>
-      </View>
-
-      <View style={styles.tabs}>
-        {(['story', 'propose', 'vote'] as Tab[]).map((t) => (
-          <TouchableOpacity
-            key={t}
-            style={[styles.tab, tab === t && styles.tabActive]}
-            onPress={() => setTab(t)}
-          >
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-              {t === 'story' ? '📖 Histoire' : t === 'propose' ? '✍️ Proposer' : `🗳️ Voter (${proposals.length})`}
-            </Text>
+    <Screen>
+      <KeyboardAvoidingView
+        style={styles.root}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={styles.back}>← Retour</Text>
           </TouchableOpacity>
-        ))}
-      </View>
+          <Text style={styles.title} numberOfLines={1}>{story.title}</Text>
+          <Text style={styles.meta}>
+            Tour {story.current_turn}/{story.max_turns} · {story.mode === 'blind' ? '🙈 Aveugle' : '👁 Tout voir'}
+          </Text>
+        </View>
 
-      <ScrollView contentContainerStyle={styles.inner}>
+        {/* Tabs */}
+        <View style={styles.tabs}>
+          {(['story', 'propose', 'vote'] as Tab[]).map((t) => (
+            <TouchableOpacity
+              key={t}
+              style={[styles.tab, tab === t && styles.tabActive]}
+              onPress={() => setTab(t)}
+            >
+              <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
+                {t === 'story' ? '📖 Histoire' : t === 'propose' ? '✍️ Proposer' : `🗳️ Voter (${proposals.length})`}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-        {tab === 'story' && (
-          <>
-            <Animated.View entering={FadeInDown.springify()}>
+        <Animated.ScrollView
+          contentContainerStyle={styles.inner}
+          style={{ opacity: fadeAnim }}
+        >
+          {/* Onglet Histoire */}
+          {tab === 'story' && (
+            <>
               <View style={styles.paragraph}>
                 <Text style={styles.paragraphLabel}>✍️ Ouverture</Text>
                 <Text style={styles.paragraphText}>{story.opening}</Text>
               </View>
-            </Animated.View>
-            {contributions.map((c, i) => (
-              <Animated.View key={c.id} entering={FadeInDown.delay(i * 100).springify()}>
-                <View style={styles.paragraph}>
+              {contributions.map((c) => (
+                <View key={c.id} style={styles.paragraph}>
                   <Text style={styles.paragraphLabel}>Tour {c.turn_number}</Text>
                   <Text style={styles.paragraphText}>{c.content}</Text>
                 </View>
-              </Animated.View>
-            ))}
-            {contributions.length === 0 && (
-              <Text style={styles.muted}>Aucun paragraphe canon pour l'instant.</Text>
-            )}
-          </>
-        )}
+              ))}
+              {contributions.length === 0 && (
+                <Text style={styles.muted}>Aucun paragraphe canon pour l'instant.</Text>
+              )}
+            </>
+          )}
 
-        {tab === 'propose' && (
-          <>
-            {story.mode === 'blind' && (
-              <Animated.View entering={FadeInDown.springify()}>
+          {/* Onglet Proposer */}
+          {tab === 'propose' && (
+            <>
+              {story.mode === 'blind' && (
                 <View style={styles.blindWarning}>
                   <Text style={styles.blindText}>🙈 Mode aveugle — tu ne vois que le dernier paragraphe.</Text>
                 </View>
+              )}
+              {contributions.length > 0 && (
+                <View style={styles.paragraph}>
+                  <Text style={styles.paragraphLabel}>Dernier paragraphe</Text>
+                  <Text style={styles.paragraphText}>
+                    {contributions[contributions.length - 1].content}
+                  </Text>
+                </View>
+              )}
+              <Text style={styles.label}>Ta suite</Text>
+              <TextInput
+                style={styles.editor}
+                value={newParagraph}
+                onChangeText={setNewParagraph}
+                placeholder="Continue l'histoire..."
+                placeholderTextColor={color.faint}
+                multiline
+                numberOfLines={6}
+                textAlignVertical="top"
+              />
+              <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                <TouchableOpacity
+                  style={[styles.btn, submitting && styles.btnDisabled]}
+                  onPress={handleSubmit}
+                  disabled={submitting}
+                >
+                  {submitting
+                    ? <Spinner size={22} dotColor={color.void} />
+                    : <Text style={styles.btnText}>Proposer ce paragraphe 🪶</Text>
+                  }
+                </TouchableOpacity>
               </Animated.View>
-            )}
-            {contributions.length > 0 && (
-              <View style={styles.paragraph}>
-                <Text style={styles.paragraphLabel}>Dernier paragraphe</Text>
-                <Text style={styles.paragraphText}>
-                  {contributions[contributions.length - 1].content}
-                </Text>
-              </View>
-            )}
-            <Text style={styles.label}>Ta suite</Text>
-            <TextInput
-              style={styles.editor}
-              value={newParagraph}
-              onChangeText={setNewParagraph}
-              placeholder="Continue l'histoire..."
-              placeholderTextColor="#9B8EA8"
-              multiline
-              numberOfLines={6}
-              textAlignVertical="top"
-            />
-            <Animated.View style={animatedBtnStyle}>
-              <TouchableOpacity
-                style={[styles.btn, submitting && styles.btnDisabled]}
-                onPress={handleSubmit}
-                disabled={submitting}
-              >
-                {submitting
-                  ? <ActivityIndicator color="#FFF8F0" />
-                  : <Text style={styles.btnText}>Proposer ce paragraphe 🪶</Text>
-                }
-              </TouchableOpacity>
-            </Animated.View>
-          </>
-        )}
+            </>
+          )}
 
-        {tab === 'vote' && (
-          <>
-            {myVote && (
-              <View style={styles.votedBanner}>
-                <Text style={styles.votedText}>✅ Tu as déjà voté ce tour.</Text>
-              </View>
-            )}
-            {proposals.length === 0 ? (
-              <Text style={styles.muted}>Aucune proposition pour l'instant.</Text>
-            ) : (
-              proposals.map((p, i) => {
-                const isMyVote = myVote === p.id
-                const isMyProposal = p.user_id === userId
-                const percent = totalVotes > 0
-                  ? Math.round((p.vote_count / totalVotes) * 100) : 0
+          {/* Onglet Vote */}
+          {tab === 'vote' && (
+            <>
+              {myVote && (
+                <View style={styles.votedBanner}>
+                  <Text style={styles.votedText}>✅ Tu as déjà voté ce tour.</Text>
+                </View>
+              )}
+              {proposals.length === 0 ? (
+                <Text style={styles.muted}>Aucune proposition pour l'instant.</Text>
+              ) : (
+                proposals.map((p) => {
+                  const isMyVote     = myVote === p.id
+                  const isMyProposal = p.user_id === userId
+                  const percent      = totalVotes > 0
+                    ? Math.round((p.vote_count / totalVotes) * 100) : 0
 
-                return (
-                  <Animated.View key={p.id} entering={FadeInDown.delay(i * 100).springify()}>
-                    <View style={[styles.proposalCard, isMyVote && styles.proposalCardVoted]}>
+                  return (
+                    <View key={p.id} style={[styles.proposalCard, isMyVote && styles.proposalCardVoted]}>
                       <Text style={styles.proposalText}>{p.content}</Text>
 
                       <View style={styles.voteBar}>
@@ -279,14 +314,14 @@ export default function StoryScreen() {
                           {p.vote_count} vote{p.vote_count !== 1 ? 's' : ''} · {percent}%
                         </Text>
                         {!myVote && !isMyProposal && (
-                          <Animated.View style={animatedBtnStyle}>
+                          <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
                             <TouchableOpacity
                               style={styles.voteBtn}
-                              onPress={() => handleVote(p.id)}
+                              onPress={() => animateAndVote(p.id)}
                               disabled={voting === p.id}
                             >
                               {voting === p.id
-                                ? <ActivityIndicator size="small" color="#FFF8F0" />
+                                ? <Spinner size={16} dotColor={color.void} />
                                 : <Text style={styles.voteBtnText}>Voter</Text>
                               }
                             </TouchableOpacity>
@@ -300,102 +335,82 @@ export default function StoryScreen() {
                         )}
                       </View>
                     </View>
-                  </Animated.View>
-                )
-              })
-            )}
-          </>
-        )}
-
-      </ScrollView>
-    </KeyboardAvoidingView>
+                  )
+                })
+              )}
+            </>
+          )}
+        </Animated.ScrollView>
+      </KeyboardAvoidingView>
+    </Screen>
   )
 }
 
-const INK    = '#1C1420'
-const VIOLET = '#6B3FA0'
-const CREAM  = '#FFF8F0'
-const MUTED  = '#7A6B85'
-const BORDER = '#DDD0E8'
-
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: CREAM },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: CREAM },
+  root: { flex: 1 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
 
   header: {
     paddingTop: 56, paddingHorizontal: 24, paddingBottom: 12,
-    borderBottomWidth: 1, borderBottomColor: BORDER, gap: 4,
+    borderBottomWidth: 1, borderBottomColor: color.border, gap: 4,
   },
-  back: { fontSize: 15, color: VIOLET, fontWeight: '500', marginBottom: 4 },
-  title: {
-    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
-    fontSize: 22, fontWeight: '600', color: INK,
-  },
-  meta: { fontSize: 13, color: MUTED },
+  back: { fontSize: 15, color: color.ember, fontWeight: '500', marginBottom: 4 },
+  title: { fontFamily: font.display, fontSize: 22, fontWeight: '600', color: color.ink },
+  meta: { fontSize: 13, color: color.muted },
 
   tabs: {
     flexDirection: 'row', borderBottomWidth: 1,
-    borderBottomColor: BORDER, backgroundColor: '#FFFFFF',
+    borderBottomColor: color.border, backgroundColor: color.surface,
   },
   tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: VIOLET },
-  tabText: { fontSize: 13, color: MUTED, fontWeight: '500' },
-  tabTextActive: { color: VIOLET, fontWeight: '600' },
+  tabActive: { borderBottomWidth: 2, borderBottomColor: color.ember },
+  tabText: { fontSize: 13, color: color.muted, fontWeight: '500' },
+  tabTextActive: { color: color.ember, fontWeight: '600' },
 
   inner: { padding: 20, gap: 14, paddingBottom: 48 },
 
-  paragraph: {
-    backgroundColor: '#FFFFFF', borderRadius: 12,
-    padding: 16, borderWidth: 1, borderColor: BORDER, gap: 8,
-  },
+  paragraph: { ...shared.card, padding: 16, gap: 8 },
   paragraphLabel: {
-    fontSize: 12, color: VIOLET, fontWeight: '600',
-    textTransform: 'uppercase', letterSpacing: 0.5,
-  },
-  paragraphText: { fontSize: 16, color: INK, lineHeight: 26 },
-
-  blindWarning: { backgroundColor: '#FAEEDA', borderRadius: 10, padding: 12 },
-  blindText: { fontSize: 13, color: '#633806' },
-
-  label: {
-    fontSize: 13, fontWeight: '600', color: MUTED,
+    fontSize: 12, color: color.ember, fontWeight: '600',
     textTransform: 'uppercase', letterSpacing: 0.8,
   },
+  paragraphText: { fontSize: 16, color: color.ink, lineHeight: 26 },
+
+  blindWarning: { backgroundColor: color.warningDim, borderRadius: radius.sm, padding: 12 },
+  blindText: { fontSize: 13, color: color.warning },
+
+  label: shared.label,
   editor: {
-    borderWidth: 1.5, borderColor: BORDER, borderRadius: 12,
-    padding: 16, fontSize: 16, color: INK,
-    backgroundColor: '#FFFFFF', minHeight: 150,
+    borderWidth: 1, borderColor: color.border, borderRadius: radius.md,
+    padding: 16, fontSize: 16, color: color.ink,
+    backgroundColor: color.surface, minHeight: 150,
   },
 
-  btn: {
-    height: 52, backgroundColor: VIOLET,
-    borderRadius: 12, alignItems: 'center', justifyContent: 'center',
-  },
+  btn: shared.btnPrimary,
   btnDisabled: { opacity: 0.6 },
-  btnText: { color: CREAM, fontSize: 16, fontWeight: '600' },
+  btnText: shared.btnPrimaryText,
 
-  votedBanner: { backgroundColor: '#E1F5EE', borderRadius: 10, padding: 12 },
-  votedText: { fontSize: 14, color: '#085041', fontWeight: '500' },
+  votedBanner: { backgroundColor: color.successDim, borderRadius: radius.sm, padding: 12 },
+  votedText: { fontSize: 14, color: color.success, fontWeight: '500' },
 
-  proposalCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 12,
-    padding: 16, borderWidth: 1, borderColor: BORDER, gap: 10,
+  proposalCard: { ...shared.card, padding: 16, gap: 10 },
+  proposalCardVoted: { borderColor: color.emberBorder, borderWidth: 1.5 },
+  proposalText: { fontSize: 15, color: color.ink, lineHeight: 24 },
+
+  voteBar: { height: 4, backgroundColor: color.border, borderRadius: 2, overflow: 'hidden' },
+  voteBarFill: { height: 4, backgroundColor: color.ember, borderRadius: 2 },
+
+  proposalFooter: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
-  proposalCardVoted: { borderColor: VIOLET, borderWidth: 2 },
-  proposalText: { fontSize: 15, color: INK, lineHeight: 24 },
-
-  voteBar: { height: 4, backgroundColor: BORDER, borderRadius: 2, overflow: 'hidden' },
-  voteBarFill: { height: 4, backgroundColor: VIOLET, borderRadius: 2 },
-
-  proposalFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  voteCount: { fontSize: 12, color: MUTED },
+  voteCount: { fontSize: 12, color: color.muted },
   voteBtn: {
-    backgroundColor: VIOLET, paddingHorizontal: 16,
-    paddingVertical: 6, borderRadius: 8,
+    backgroundColor: color.ember, paddingHorizontal: 16,
+    paddingVertical: 6, borderRadius: radius.sm, minWidth: 56, alignItems: 'center',
   },
-  voteBtnText: { color: CREAM, fontSize: 13, fontWeight: '600' },
-  myProposalTag: { fontSize: 12, color: MUTED, fontStyle: 'italic' },
-  myVoteTag: { fontSize: 12, color: VIOLET, fontWeight: '600' },
+  voteBtnText: { color: color.void, fontSize: 13, fontWeight: '700' },
+  myProposalTag: { fontSize: 12, color: color.muted, fontStyle: 'italic' },
+  myVoteTag: { fontSize: 12, color: color.ember, fontWeight: '600' },
 
-  muted: { fontSize: 15, color: MUTED, textAlign: 'center', paddingVertical: 24 },
+  muted: { fontSize: 15, color: color.muted, textAlign: 'center', paddingVertical: 24 },
 })

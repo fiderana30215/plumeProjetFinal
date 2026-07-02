@@ -1,36 +1,23 @@
-import { View, StyleSheet } from 'react-native'
-import Animated, {
-  useSharedValue, useAnimatedStyle,
-  withRepeat, withTiming, Easing
-} from 'react-native-reanimated'
-import { useEffect } from 'react'
+import { View, Text, StyleSheet } from 'react-native'
+import Screen from './Screen'
+import Spinner from './Spinner'
+import { color, font } from '../constants/theme'
 
 export default function LoadingScreen() {
-  const opacity = useSharedValue(0.3)
-
-  useEffect(() => {
-    opacity.value = withRepeat(
-      withTiming(1, { duration: 800, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      true
-    )
-  }, [])
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value
-  }))
-
   return (
-    <View style={styles.root}>
-      <Animated.Text style={[styles.feather, animatedStyle]}>🪶</Animated.Text>
-    </View>
+    <Screen>
+      <View style={styles.root}>
+        <Spinner size={44} />
+        <Text style={styles.text}>un instant...</Text>
+      </View>
+    </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1, justifyContent: 'center',
-    alignItems: 'center', backgroundColor: '#FFF8F0',
+  root: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 18 },
+  text: {
+    fontFamily: font.display, fontStyle: 'italic',
+    fontSize: 15, color: color.muted, letterSpacing: 0.4,
   },
-  feather: { fontSize: 48 },
 })
