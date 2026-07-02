@@ -12,11 +12,15 @@ import LoadingScreen from '../../components/LoadingScreen'
 import Screen from '../../components/Screen'
 import Spinner from '../../components/Spinner'
 import type { StoryRow, ContributionRow } from '../../types/database'
-import { color, font, radius, shared } from '../../constants/theme'
+import { useTheme } from '../../contexts/ThemeContext'
+import { useLanguage } from '../../contexts/LanguageContext'
+import { font, radius, ColorTokens } from '../../constants/theme'
 
 type Tab = 'story' | 'propose' | 'vote'
 
 export default function StoryScreen() {
+  const { color, shared } = useTheme()
+  const { t } = useLanguage()
   const params = useLocalSearchParams<{ id?: string }>()
 
   // Sur web, l'id peut venir des params OU de l'URL directement
@@ -112,7 +116,7 @@ export default function StoryScreen() {
 
   async function handleSubmit() {
     if (!newParagraph.trim()) {
-      Alert.alert('Paragraphe vide', 'Écris quelque chose avant de proposer.')
+      Alert.alert(t.story.emptyParagraphTitle, t.story.emptyParagraphBody)
       return
     }
     if (!userId || !story) return
@@ -126,22 +130,22 @@ export default function StoryScreen() {
     }])
     setSubmitting(false)
 
-    if (error) { Alert.alert('Erreur', error.message); return }
+    if (error) { Alert.alert(t.common.error, error.message); return }
 
     setNewParagraph('')
     await sendLocalNotification(
       'Paragraphe proposé 🪶',
       'Ta proposition a été soumise au vote !'
     )
-    Alert.alert('Proposé ! 🪶', 'Ton paragraphe a été soumis.', [
-      { text: 'Voir les votes', onPress: () => setTab('vote') }
+    Alert.alert(t.story.proposedTitle, t.story.proposedBody, [
+      { text: t.story.seeVotes, onPress: () => setTab('vote') }
     ])
   }
 
   async function handleVote(contributionId: string) {
     if (!userId || !story || myVote) return
     if (proposals.find(p => p.id === contributionId)?.user_id === userId) {
-      Alert.alert('Interdit', 'Tu ne peux pas voter pour ta propre proposition.')
+      Alert.alert(t.story.forbiddenTitle, t.story.forbiddenBody)
       return
     }
 
@@ -163,7 +167,7 @@ export default function StoryScreen() {
         'Ton vote a bien été pris en compte.'
       )
     } else {
-      Alert.alert('Erreur', error.message)
+      Alert.alert(t.common.error, error.message)
     }
 
     setVoting(null)
@@ -172,13 +176,15 @@ export default function StoryScreen() {
 
   if (loading) return <LoadingScreen />
 
+  const styles = makeStyles(color)
+
   if (!story) {
     return (
       <Screen>
         <View style={styles.centered}>
-          <Text style={styles.muted}>Histoire introuvable. (id: {id || 'vide'})</Text>
+          <Text style={styles.muted}>{t.story.notFound} (id: {id || '—'})</Text>
           <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 16 }}>
-            <Text style={{ color: color.ember }}>← Retour</Text>
+            <Text style={{ color: color.ember }}>{t.common.back}</Text>
           </TouchableOpacity>
         </View>
       </Screen>
@@ -196,24 +202,24 @@ export default function StoryScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.back}>← Retour</Text>
+            <Text style={styles.back}>{t.common.back}</Text>
           </TouchableOpacity>
           <Text style={styles.title} numberOfLines={1}>{story.title}</Text>
           <Text style={styles.meta}>
-            Tour {story.current_turn}/{story.max_turns} · {story.mode === 'blind' ? '🙈 Aveugle' : '👁 Tout voir'}
+            {t.story.turn} {story.current_turn}/{story.max_turns} · {story.mode === 'blind' ? t.feed.blind : t.feed.full}
           </Text>
         </View>
 
         {/* Tabs */}
         <View style={styles.tabs}>
-          {(['story', 'propose', 'vote'] as Tab[]).map((t) => (
+          {(['story', 'propose', 'vote'] as Tab[]).map((tb) => (
             <TouchableOpacity
-              key={t}
-              style={[styles.tab, tab === t && styles.tabActive]}
-              onPress={() => setTab(t)}
+              key={tb}
+              style={[styles.tab, tab === tb && styles.tabActive]}
+              onPress={() => setTab(tb)}
             >
-              <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-                {t === 'story' ? '📖 Histoire' : t === 'propose' ? '✍️ Proposer' : `🗳️ Voter (${proposals.length})`}
+              <Text style={[styles.tabText, tab === tb && styles.tabTextActive]}>
+                {tb === 'story' ? t.story.tabStory : tb === 'propose' ? t.story.tabPropose : `${t.story.tabVote} (${proposals.length})`}
               </Text>
             </TouchableOpacity>
           ))}
@@ -227,17 +233,17 @@ export default function StoryScreen() {
           {tab === 'story' && (
             <>
               <View style={styles.paragraph}>
-                <Text style={styles.paragraphLabel}>✍️ Ouverture</Text>
+                <Text style={styles.paragraphLabel}>{t.story.opening}</Text>
                 <Text style={styles.paragraphText}>{story.opening}</Text>
               </View>
               {contributions.map((c) => (
                 <View key={c.id} style={styles.paragraph}>
-                  <Text style={styles.paragraphLabel}>Tour {c.turn_number}</Text>
+                  <Text style={styles.paragraphLabel}>{t.story.turn} {c.turn_number}</Text>
                   <Text style={styles.paragraphText}>{c.content}</Text>
                 </View>
               ))}
               {contributions.length === 0 && (
-                <Text style={styles.muted}>Aucun paragraphe canon pour l'instant.</Text>
+                <Text style={styles.muted}>{t.story.noCanon}</Text>
               )}
             </>
           )}
@@ -247,23 +253,23 @@ export default function StoryScreen() {
             <>
               {story.mode === 'blind' && (
                 <View style={styles.blindWarning}>
-                  <Text style={styles.blindText}>🙈 Mode aveugle — tu ne vois que le dernier paragraphe.</Text>
+                  <Text style={styles.blindText}>{t.story.blindWarning}</Text>
                 </View>
               )}
               {contributions.length > 0 && (
                 <View style={styles.paragraph}>
-                  <Text style={styles.paragraphLabel}>Dernier paragraphe</Text>
+                  <Text style={styles.paragraphLabel}>{t.story.lastParagraph}</Text>
                   <Text style={styles.paragraphText}>
                     {contributions[contributions.length - 1].content}
                   </Text>
                 </View>
               )}
-              <Text style={styles.label}>Ta suite</Text>
+              <Text style={shared.label}>{t.story.yourTurn}</Text>
               <TextInput
                 style={styles.editor}
                 value={newParagraph}
                 onChangeText={setNewParagraph}
-                placeholder="Continue l'histoire..."
+                placeholder={t.story.editorPlaceholder}
                 placeholderTextColor={color.faint}
                 multiline
                 numberOfLines={6}
@@ -271,13 +277,13 @@ export default function StoryScreen() {
               />
               <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
                 <TouchableOpacity
-                  style={[styles.btn, submitting && styles.btnDisabled]}
+                  style={[shared.btnPrimary, submitting && styles.btnDisabled]}
                   onPress={handleSubmit}
                   disabled={submitting}
                 >
                   {submitting
                     ? <Spinner size={22} dotColor={color.void} />
-                    : <Text style={styles.btnText}>Proposer ce paragraphe 🪶</Text>
+                    : <Text style={shared.btnPrimaryText}>{t.story.submit}</Text>
                   }
                 </TouchableOpacity>
               </Animated.View>
@@ -289,11 +295,11 @@ export default function StoryScreen() {
             <>
               {myVote && (
                 <View style={styles.votedBanner}>
-                  <Text style={styles.votedText}>✅ Tu as déjà voté ce tour.</Text>
+                  <Text style={styles.votedText}>{t.story.alreadyVoted}</Text>
                 </View>
               )}
               {proposals.length === 0 ? (
-                <Text style={styles.muted}>Aucune proposition pour l'instant.</Text>
+                <Text style={styles.muted}>{t.story.noProposals}</Text>
               ) : (
                 proposals.map((p) => {
                   const isMyVote     = myVote === p.id
@@ -311,7 +317,7 @@ export default function StoryScreen() {
 
                       <View style={styles.proposalFooter}>
                         <Text style={styles.voteCount}>
-                          {p.vote_count} vote{p.vote_count !== 1 ? 's' : ''} · {percent}%
+                          {p.vote_count} · {percent}%
                         </Text>
                         {!myVote && !isMyProposal && (
                           <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
@@ -322,16 +328,16 @@ export default function StoryScreen() {
                             >
                               {voting === p.id
                                 ? <Spinner size={16} dotColor={color.void} />
-                                : <Text style={styles.voteBtnText}>Voter</Text>
+                                : <Text style={styles.voteBtnText}>{t.story.vote}</Text>
                               }
                             </TouchableOpacity>
                           </Animated.View>
                         )}
                         {isMyProposal && (
-                          <Text style={styles.myProposalTag}>Ta proposition</Text>
+                          <Text style={styles.myProposalTag}>{t.story.yourProposal}</Text>
                         )}
                         {isMyVote && (
-                          <Text style={styles.myVoteTag}>✅ Ton vote</Text>
+                          <Text style={styles.myVoteTag}>{t.story.yourVote}</Text>
                         )}
                       </View>
                     </View>
@@ -346,71 +352,76 @@ export default function StoryScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+function makeStyles(color: ColorTokens) {
+  return StyleSheet.create({
+    root: { flex: 1 },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
 
-  header: {
-    paddingTop: 56, paddingHorizontal: 24, paddingBottom: 12,
-    borderBottomWidth: 1, borderBottomColor: color.border, gap: 4,
-  },
-  back: { fontSize: 15, color: color.ember, fontWeight: '500', marginBottom: 4 },
-  title: { fontFamily: font.display, fontSize: 22, fontWeight: '600', color: color.ink },
-  meta: { fontSize: 13, color: color.muted },
+    header: {
+      paddingTop: 56, paddingHorizontal: 24, paddingBottom: 12,
+      borderBottomWidth: 1, borderBottomColor: color.border, gap: 4,
+    },
+    back: { fontSize: 15, color: color.ember, fontWeight: '500', marginBottom: 4 },
+    title: { fontFamily: font.display, fontSize: 22, fontWeight: '600', color: color.ink },
+    meta: { fontSize: 13, color: color.muted },
 
-  tabs: {
-    flexDirection: 'row', borderBottomWidth: 1,
-    borderBottomColor: color.border, backgroundColor: color.surface,
-  },
-  tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: color.ember },
-  tabText: { fontSize: 13, color: color.muted, fontWeight: '500' },
-  tabTextActive: { color: color.ember, fontWeight: '600' },
+    tabs: {
+      flexDirection: 'row', borderBottomWidth: 1,
+      borderBottomColor: color.border, backgroundColor: color.surface,
+    },
+    tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
+    tabActive: { borderBottomWidth: 2, borderBottomColor: color.ember },
+    tabText: { fontSize: 13, color: color.muted, fontWeight: '500' },
+    tabTextActive: { color: color.ember, fontWeight: '600' },
 
-  inner: { padding: 20, gap: 14, paddingBottom: 48 },
+    inner: { padding: 20, gap: 14, paddingBottom: 48 },
 
-  paragraph: { ...shared.card, padding: 16, gap: 8 },
-  paragraphLabel: {
-    fontSize: 12, color: color.ember, fontWeight: '600',
-    textTransform: 'uppercase', letterSpacing: 0.8,
-  },
-  paragraphText: { fontSize: 16, color: color.ink, lineHeight: 26 },
+    paragraph: {
+      backgroundColor: color.surface, borderRadius: radius.lg,
+      borderWidth: 1, borderColor: color.border, padding: 16, gap: 8,
+    },
+    paragraphLabel: {
+      fontSize: 12, color: color.ember, fontWeight: '600',
+      textTransform: 'uppercase', letterSpacing: 0.8,
+    },
+    paragraphText: { fontSize: 16, color: color.ink, lineHeight: 26 },
 
-  blindWarning: { backgroundColor: color.warningDim, borderRadius: radius.sm, padding: 12 },
-  blindText: { fontSize: 13, color: color.warning },
+    blindWarning: { backgroundColor: color.warningDim, borderRadius: radius.sm, padding: 12 },
+    blindText: { fontSize: 13, color: color.warning },
 
-  label: shared.label,
-  editor: {
-    borderWidth: 1, borderColor: color.border, borderRadius: radius.md,
-    padding: 16, fontSize: 16, color: color.ink,
-    backgroundColor: color.surface, minHeight: 150,
-  },
+    editor: {
+      borderWidth: 1, borderColor: color.border, borderRadius: radius.md,
+      padding: 16, fontSize: 16, color: color.ink,
+      backgroundColor: color.surface, minHeight: 150,
+    },
 
-  btn: shared.btnPrimary,
-  btnDisabled: { opacity: 0.6 },
-  btnText: shared.btnPrimaryText,
+    btnDisabled: { opacity: 0.6 },
 
-  votedBanner: { backgroundColor: color.successDim, borderRadius: radius.sm, padding: 12 },
-  votedText: { fontSize: 14, color: color.success, fontWeight: '500' },
+    votedBanner: { backgroundColor: color.successDim, borderRadius: radius.sm, padding: 12 },
+    votedText: { fontSize: 14, color: color.success, fontWeight: '500' },
 
-  proposalCard: { ...shared.card, padding: 16, gap: 10 },
-  proposalCardVoted: { borderColor: color.emberBorder, borderWidth: 1.5 },
-  proposalText: { fontSize: 15, color: color.ink, lineHeight: 24 },
+    proposalCard: {
+      backgroundColor: color.surface, borderRadius: radius.lg,
+      borderWidth: 1, borderColor: color.border, padding: 16, gap: 10,
+    },
+    proposalCardVoted: { borderColor: color.emberBorder, borderWidth: 1.5 },
+    proposalText: { fontSize: 15, color: color.ink, lineHeight: 24 },
 
-  voteBar: { height: 4, backgroundColor: color.border, borderRadius: 2, overflow: 'hidden' },
-  voteBarFill: { height: 4, backgroundColor: color.ember, borderRadius: 2 },
+    voteBar: { height: 4, backgroundColor: color.border, borderRadius: 2, overflow: 'hidden' },
+    voteBarFill: { height: 4, backgroundColor: color.ember, borderRadius: 2 },
 
-  proposalFooter: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-  },
-  voteCount: { fontSize: 12, color: color.muted },
-  voteBtn: {
-    backgroundColor: color.ember, paddingHorizontal: 16,
-    paddingVertical: 6, borderRadius: radius.sm, minWidth: 56, alignItems: 'center',
-  },
-  voteBtnText: { color: color.void, fontSize: 13, fontWeight: '700' },
-  myProposalTag: { fontSize: 12, color: color.muted, fontStyle: 'italic' },
-  myVoteTag: { fontSize: 12, color: color.ember, fontWeight: '600' },
+    proposalFooter: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    },
+    voteCount: { fontSize: 12, color: color.muted },
+    voteBtn: {
+      backgroundColor: color.ember, paddingHorizontal: 16,
+      paddingVertical: 6, borderRadius: radius.sm, minWidth: 56, alignItems: 'center',
+    },
+    voteBtnText: { color: color.void, fontSize: 13, fontWeight: '700' },
+    myProposalTag: { fontSize: 12, color: color.muted, fontStyle: 'italic' },
+    myVoteTag: { fontSize: 12, color: color.ember, fontWeight: '600' },
 
-  muted: { fontSize: 15, color: color.muted, textAlign: 'center', paddingVertical: 24 },
-})
+    muted: { fontSize: 15, color: color.muted, textAlign: 'center', paddingVertical: 24 },
+  })
+}

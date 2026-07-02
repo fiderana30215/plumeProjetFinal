@@ -8,9 +8,13 @@ import { supabase } from '../../lib/supabase'
 import LoadingScreen from '../../components/LoadingScreen'
 import Screen from '../../components/Screen'
 import type { StoryRow } from '../../types/database'
-import { color, font, radius, shared, statusLabel } from '../../constants/theme'
+import { useTheme } from '../../contexts/ThemeContext'
+import { useLanguage } from '../../contexts/LanguageContext'
+import { font, radius, statusLabel, ColorTokens } from '../../constants/theme'
 
-function AnimatedCard({ item, index, onPress }: { item: StoryRow, index: number, onPress: () => void }) {
+function AnimatedCard({ item, index, onPress, color, t }: {
+  item: StoryRow, index: number, onPress: () => void, color: ColorTokens, t: any,
+}) {
   const fadeAnim = useRef(new Animated.Value(0)).current
   const slideAnim = useRef(new Animated.Value(30)).current
 
@@ -27,7 +31,12 @@ function AnimatedCard({ item, index, onPress }: { item: StoryRow, index: number,
     ]).start()
   }, [])
 
-  const status = statusLabel(item.status)
+  const status = statusLabel(item.status, color)
+  const statusText = status.text === 'open' ? t.profile.statusOpen
+    : status.text === 'in_progress' ? t.profile.statusInProgress
+    : t.profile.statusFinished
+
+  const styles = makeStyles(color)
 
   return (
     <Animated.View style={{
@@ -39,22 +48,22 @@ function AnimatedCard({ item, index, onPress }: { item: StoryRow, index: number,
         <View style={styles.cardTop}>
           <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
           <View style={[styles.badge, { backgroundColor: status.dim }]}>
-            <Text style={[styles.badgeText, { color: status.color }]}>{status.text}</Text>
+            <Text style={[styles.badgeText, { color: status.color }]}>{statusText}</Text>
           </View>
         </View>
         <Text style={styles.cardOpening} numberOfLines={2}>{item.opening}</Text>
         <View style={styles.cardFooter}>
           <Text style={styles.cardMeta}>
-            {item.mode === 'blind' ? '🙈 À l\'aveugle' : '👁 Tout voir'}
+            {item.mode === 'blind' ? t.feed.blind : t.feed.full}
           </Text>
-          <Text style={styles.cardMeta}>Tour {item.current_turn}/{item.max_turns}</Text>
+          <Text style={styles.cardMeta}>{t.feed.turn} {item.current_turn}/{item.max_turns}</Text>
         </View>
       </TouchableOpacity>
     </Animated.View>
   )
 }
 
-function FABButton({ onPress }: { onPress: () => void }) {
+function FABButton({ onPress, color }: { onPress: () => void, color: ColorTokens }) {
   const fadeAnim = useRef(new Animated.Value(0)).current
   const slideAnim = useRef(new Animated.Value(30)).current
 
@@ -64,6 +73,8 @@ function FABButton({ onPress }: { onPress: () => void }) {
       Animated.timing(slideAnim, { toValue: 0, duration: 400, delay: 300, useNativeDriver: false }),
     ]).start()
   }, [])
+
+  const styles = makeStyles(color)
 
   return (
     <Animated.View style={[styles.fabWrapper, {
@@ -78,6 +89,8 @@ function FABButton({ onPress }: { onPress: () => void }) {
 }
 
 export default function FeedScreen() {
+  const { color } = useTheme()
+  const { t } = useLanguage()
   const [stories, setStories] = useState<StoryRow[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -110,12 +123,14 @@ export default function FeedScreen() {
 
   if (loading) return <LoadingScreen />
 
+  const styles = makeStyles(color)
+
   return (
     <Screen>
       <View style={styles.root}>
         <View style={styles.header}>
-          <Text style={styles.title}>Plume Relais</Text>
-          <Text style={styles.subtitle}>Histoires en cours</Text>
+          <Text style={styles.title}>{t.feed.title}</Text>
+          <Text style={styles.subtitle}>{t.feed.subtitle}</Text>
         </View>
 
         <FlatList
@@ -128,12 +143,12 @@ export default function FeedScreen() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Text style={styles.emptyIcon}>🪶</Text>
-              <Text style={styles.emptyText}>Aucune histoire pour l'instant.</Text>
+              <Text style={styles.emptyText}>{t.feed.empty}</Text>
               <TouchableOpacity
                 style={styles.emptyBtn}
                 onPress={() => router.push('/(tabs)/create')}
               >
-                <Text style={styles.emptyBtnText}>Créer la première</Text>
+                <Text style={styles.emptyBtnText}>{t.feed.createFirst}</Text>
               </TouchableOpacity>
             </View>
           }
@@ -141,6 +156,8 @@ export default function FeedScreen() {
             <AnimatedCard
               item={item as StoryRow}
               index={index}
+              color={color}
+              t={t}
               onPress={() => router.push({
                 pathname: '/story/[id]',
                 params: { id: item.id }
@@ -149,42 +166,47 @@ export default function FeedScreen() {
           )}
         />
 
-        <FABButton onPress={() => router.push('/(tabs)/create')} />
+        <FABButton color={color} onPress={() => router.push('/(tabs)/create')} />
       </View>
     </Screen>
   )
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  header: {
-    paddingTop: 60, paddingHorizontal: 24, paddingBottom: 16,
-    borderBottomWidth: 1, borderBottomColor: color.border,
-  },
-  title: { fontFamily: font.display, fontSize: 28, fontWeight: '600', color: color.ink },
-  subtitle: { fontFamily: font.display, fontStyle: 'italic', fontSize: 14, color: color.muted, marginTop: 2 },
-  list: { padding: 16 },
-  emptyContainer: { flex: 1 },
-  card: { ...shared.card, padding: 16, gap: 8 },
-  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  cardTitle: { fontSize: 17, fontWeight: '600', color: color.ink, flex: 1 },
-  badge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill },
-  badgeText: { fontSize: 12, fontWeight: '600' },
-  cardOpening: { fontSize: 14, color: color.muted, lineHeight: 20 },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  cardMeta: { fontSize: 12, color: color.faint },
-  empty: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, paddingTop: 80 },
-  emptyIcon: { fontSize: 48 },
-  emptyText: { fontSize: 16, color: color.muted },
-  emptyBtn: { backgroundColor: color.ember, paddingHorizontal: 24, paddingVertical: 12, borderRadius: radius.md },
-  emptyBtnText: { color: color.void, fontWeight: '700', fontSize: 15 },
-  fabWrapper: { position: 'absolute', bottom: 24, right: 24 },
-  fab: {
-    width: 56, height: 56, borderRadius: 28,
-    backgroundColor: color.ember,
-    justifyContent: 'center', alignItems: 'center',
-    shadowColor: color.ember, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35, shadowRadius: 10, elevation: 6,
-  },
-  fabText: { color: color.void, fontSize: 28, lineHeight: 32 },
-})
+function makeStyles(color: ColorTokens) {
+  return StyleSheet.create({
+    root: { flex: 1 },
+    header: {
+      paddingTop: 60, paddingHorizontal: 24, paddingBottom: 16,
+      borderBottomWidth: 1, borderBottomColor: color.border,
+    },
+    title: { fontFamily: font.display, fontSize: 28, fontWeight: '600', color: color.ink },
+    subtitle: { fontFamily: font.display, fontStyle: 'italic', fontSize: 14, color: color.muted, marginTop: 2 },
+    list: { padding: 16 },
+    emptyContainer: { flex: 1 },
+    card: {
+      backgroundColor: color.surface, borderRadius: radius.lg,
+      borderWidth: 1, borderColor: color.border, padding: 16, gap: 8,
+    },
+    cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    cardTitle: { fontSize: 17, fontWeight: '600', color: color.ink, flex: 1 },
+    badge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill },
+    badgeText: { fontSize: 12, fontWeight: '600' },
+    cardOpening: { fontSize: 14, color: color.muted, lineHeight: 20 },
+    cardFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
+    cardMeta: { fontSize: 12, color: color.faint },
+    empty: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, paddingTop: 80 },
+    emptyIcon: { fontSize: 48 },
+    emptyText: { fontSize: 16, color: color.muted },
+    emptyBtn: { backgroundColor: color.ember, paddingHorizontal: 24, paddingVertical: 12, borderRadius: radius.md },
+    emptyBtnText: { color: color.void, fontWeight: '700', fontSize: 15 },
+    fabWrapper: { position: 'absolute', bottom: 24, right: 24 },
+    fab: {
+      width: 56, height: 56, borderRadius: 28,
+      backgroundColor: color.ember,
+      justifyContent: 'center', alignItems: 'center',
+      shadowColor: color.ember, shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.35, shadowRadius: 10, elevation: 6,
+    },
+    fabText: { color: color.void, fontSize: 28, lineHeight: 32 },
+  })
+}

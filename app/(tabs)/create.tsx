@@ -9,12 +9,16 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/useAuth'
 import Screen from '../../components/Screen'
 import Spinner from '../../components/Spinner'
-import { color, font, radius, shared } from '../../constants/theme'
+import { useTheme } from '../../contexts/ThemeContext'
+import { useLanguage } from '../../contexts/LanguageContext'
+import { font, radius, ColorTokens } from '../../constants/theme'
 
 type Mode = 'full' | 'blind'
 type Visibility = 'public' | 'private'
 
 export default function CreateStoryScreen() {
+  const { color, shared } = useTheme()
+  const { t } = useLanguage()
   const { userId } = useAuth()
 
   const [title, setTitle] = useState('')
@@ -31,11 +35,11 @@ export default function CreateStoryScreen() {
 
   async function handleCreate() {
     if (!title.trim() || !opening.trim()) {
-      Alert.alert('Champs manquants', "Le titre et l'ouverture sont obligatoires.")
+      Alert.alert(t.create.missingFieldsTitle, t.create.missingFieldsBody)
       return
     }
     if (!userId) {
-      Alert.alert('Erreur', 'Tu dois être connecté pour créer une histoire.')
+      Alert.alert(t.common.error, t.create.notAuthBody)
       return
     }
 
@@ -55,7 +59,7 @@ export default function CreateStoryScreen() {
     setSubmitting(false)
 
     if (error) {
-      Alert.alert('Erreur', error.message)
+      Alert.alert(t.common.error, error.message)
       return
     }
 
@@ -69,35 +73,37 @@ export default function CreateStoryScreen() {
     router.replace(`/story/${data.id}` as any)
   }
 
+  const styles = makeStyles(color)
+
   return (
     <Screen>
       <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
             <Text style={styles.feather}>🪶</Text>
-            <Text style={styles.title}>Nouvelle histoire</Text>
-            <Text style={styles.subtitle}>Pose la première pierre du récit</Text>
+            <Text style={styles.title}>{t.create.title}</Text>
+            <Text style={styles.subtitle}>{t.create.subtitle}</Text>
           </View>
 
-          <View style={styles.card}>
+          <View style={[shared.card, styles.card]}>
             <View style={styles.field}>
-              <Text style={styles.label}>Titre</Text>
+              <Text style={shared.label}>{t.create.titleLabel}</Text>
               <TextInput
-                style={styles.input}
+                style={shared.input}
                 value={title}
                 onChangeText={setTitle}
-                placeholder="Le nom de ton histoire"
+                placeholder={t.create.titlePlaceholder}
                 placeholderTextColor={color.faint}
               />
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>Ouverture</Text>
+              <Text style={shared.label}>{t.create.openingLabel}</Text>
               <TextInput
                 style={styles.editor}
                 value={opening}
                 onChangeText={setOpening}
-                placeholder="Écris le tout premier paragraphe..."
+                placeholder={t.create.openingPlaceholder}
                 placeholderTextColor={color.faint}
                 multiline
                 numberOfLines={6}
@@ -106,44 +112,44 @@ export default function CreateStoryScreen() {
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>Mode</Text>
+              <Text style={shared.label}>{t.create.modeLabel}</Text>
               <View style={styles.segmented}>
                 <TouchableOpacity
                   style={[styles.segment, mode === 'full' && styles.segmentActive]}
                   onPress={() => setMode('full')}
                 >
-                  <Text style={[styles.segmentText, mode === 'full' && styles.segmentTextActive]}>👁 Tout voir</Text>
+                  <Text style={[styles.segmentText, mode === 'full' && styles.segmentTextActive]}>{t.create.modeFull}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.segment, mode === 'blind' && styles.segmentActive]}
                   onPress={() => setMode('blind')}
                 >
-                  <Text style={[styles.segmentText, mode === 'blind' && styles.segmentTextActive]}>🙈 Aveugle</Text>
+                  <Text style={[styles.segmentText, mode === 'blind' && styles.segmentTextActive]}>{t.create.modeBlind}</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>Visibilité</Text>
+              <Text style={shared.label}>{t.create.visibilityLabel}</Text>
               <View style={styles.segmented}>
                 <TouchableOpacity
                   style={[styles.segment, visibility === 'public' && styles.segmentActive]}
                   onPress={() => setVisibility('public')}
                 >
-                  <Text style={[styles.segmentText, visibility === 'public' && styles.segmentTextActive]}>Publique</Text>
+                  <Text style={[styles.segmentText, visibility === 'public' && styles.segmentTextActive]}>{t.create.visibilityPublic}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.segment, visibility === 'private' && styles.segmentActive]}
                   onPress={() => setVisibility('private')}
                 >
-                  <Text style={[styles.segmentText, visibility === 'private' && styles.segmentTextActive]}>Privée</Text>
+                  <Text style={[styles.segmentText, visibility === 'private' && styles.segmentTextActive]}>{t.create.visibilityPrivate}</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
             <View style={styles.row}>
               <View style={[styles.field, styles.rowItem]}>
-                <Text style={styles.label}>Tours max</Text>
+                <Text style={shared.label}>{t.create.maxTurns}</Text>
                 <View style={styles.stepper}>
                   <TouchableOpacity style={styles.stepperBtn} onPress={() => adjust(setMaxTurns, maxTurns, -1, 2, 50)}>
                     <Text style={styles.stepperBtnText}>−</Text>
@@ -156,7 +162,7 @@ export default function CreateStoryScreen() {
               </View>
 
               <View style={[styles.field, styles.rowItem]}>
-                <Text style={styles.label}>Durée / tour (min)</Text>
+                <Text style={shared.label}>{t.create.turnDuration}</Text>
                 <View style={styles.stepper}>
                   <TouchableOpacity style={styles.stepperBtn} onPress={() => adjust(setTurnDuration, turnDuration, -15, 5, 1440)}>
                     <Text style={styles.stepperBtnText}>−</Text>
@@ -170,13 +176,13 @@ export default function CreateStoryScreen() {
             </View>
 
             <TouchableOpacity
-              style={[styles.btn, submitting && styles.btnDisabled]}
+              style={[shared.btnPrimary, submitting && styles.btnDisabled]}
               onPress={handleCreate}
               disabled={submitting}
             >
               {submitting
                 ? <Spinner size={22} dotColor={color.void} />
-                : <Text style={styles.btnText}>Lancer l'histoire 🪶</Text>
+                : <Text style={shared.btnPrimaryText}>{t.create.submit}</Text>
               }
             </TouchableOpacity>
           </View>
@@ -186,45 +192,43 @@ export default function CreateStoryScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  inner: { flexGrow: 1, padding: 24, paddingBottom: 48, gap: 28 },
-  header: { alignItems: 'center', gap: 8, paddingTop: 12 },
-  feather: { fontSize: 36 },
-  title: { fontFamily: font.display, fontSize: 26, fontWeight: '600', color: color.ink },
-  subtitle: { fontFamily: font.display, fontStyle: 'italic', fontSize: 14, color: color.muted },
+function makeStyles(color: ColorTokens) {
+  return StyleSheet.create({
+    root: { flex: 1 },
+    inner: { flexGrow: 1, padding: 24, paddingBottom: 48, gap: 28 },
+    header: { alignItems: 'center', gap: 8, paddingTop: 12 },
+    feather: { fontSize: 36 },
+    title: { fontFamily: font.display, fontSize: 26, fontWeight: '600', color: color.ink },
+    subtitle: { fontFamily: font.display, fontStyle: 'italic', fontSize: 14, color: color.muted },
 
-  card: { ...shared.card, padding: 20, gap: 18 },
-  field: { gap: 8 },
-  label: shared.label,
-  input: shared.input,
-  editor: {
-    borderWidth: 1, borderColor: color.border, borderRadius: radius.md,
-    padding: 16, fontSize: 16, color: color.ink,
-    backgroundColor: color.surface, minHeight: 130,
-  },
+    card: { padding: 20, gap: 18 },
+    field: { gap: 8 },
+    editor: {
+      borderWidth: 1, borderColor: color.border, borderRadius: radius.md,
+      padding: 16, fontSize: 16, color: color.ink,
+      backgroundColor: color.surface, minHeight: 130,
+    },
 
-  segmented: {
-    flexDirection: 'row', borderWidth: 1, borderColor: color.border,
-    borderRadius: radius.md, overflow: 'hidden',
-  },
-  segment: { flex: 1, paddingVertical: 12, alignItems: 'center', backgroundColor: color.surface },
-  segmentActive: { backgroundColor: color.emberDim },
-  segmentText: { fontSize: 13, color: color.muted, fontWeight: '500' },
-  segmentTextActive: { color: color.ember, fontWeight: '700' },
+    segmented: {
+      flexDirection: 'row', borderWidth: 1, borderColor: color.border,
+      borderRadius: radius.md, overflow: 'hidden',
+    },
+    segment: { flex: 1, paddingVertical: 12, alignItems: 'center', backgroundColor: color.surface },
+    segmentActive: { backgroundColor: color.emberDim },
+    segmentText: { fontSize: 13, color: color.muted, fontWeight: '500' },
+    segmentTextActive: { color: color.ember, fontWeight: '700' },
 
-  row: { flexDirection: 'row', gap: 12 },
-  rowItem: { flex: 1 },
-  stepper: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    borderWidth: 1, borderColor: color.border, borderRadius: radius.md,
-    paddingHorizontal: 4, height: 52,
-  },
-  stepperBtn: { width: 36, height: 36, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
-  stepperBtnText: { fontSize: 20, color: color.ember, fontWeight: '600' },
-  stepperValue: { fontSize: 16, color: color.ink, fontWeight: '600' },
+    row: { flexDirection: 'row', gap: 12 },
+    rowItem: { flex: 1 },
+    stepper: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      borderWidth: 1, borderColor: color.border, borderRadius: radius.md,
+      paddingHorizontal: 4, height: 52,
+    },
+    stepperBtn: { width: 36, height: 36, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+    stepperBtnText: { fontSize: 20, color: color.ember, fontWeight: '600' },
+    stepperValue: { fontSize: 16, color: color.ink, fontWeight: '600' },
 
-  btn: shared.btnPrimary,
-  btnDisabled: { opacity: 0.6 },
-  btnText: shared.btnPrimaryText,
-})
+    btnDisabled: { opacity: 0.6 },
+  })
+}

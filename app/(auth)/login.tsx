@@ -7,9 +7,13 @@ import { useState } from 'react'
 import { signIn } from '../../lib/useAuth'
 import Screen from '../../components/Screen'
 import Spinner from '../../components/Spinner'
-import { color, font, radius, shared } from '../../constants/theme'
+import { useTheme } from '../../contexts/ThemeContext'
+import { useLanguage } from '../../contexts/LanguageContext'
+import { font, radius } from '../../constants/theme'
 
 export default function LoginScreen() {
+  const { color, shared } = useTheme()
+  const { t } = useLanguage()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -17,7 +21,7 @@ export default function LoginScreen() {
 
   async function handleLogin() {
     if (!email.trim() || !password) {
-      setError("Remplis l'e-mail et le mot de passe.")
+      setError(t.auth.missingFieldsLogin)
       return
     }
     setError('')
@@ -31,6 +35,8 @@ export default function LoginScreen() {
     router.replace('/(tabs)/feed')
   }
 
+  const styles = makeStyles(color)
+
   return (
     <Screen>
       <KeyboardAvoidingView
@@ -40,18 +46,18 @@ export default function LoginScreen() {
         <View style={styles.inner}>
           <View style={styles.header}>
             <Text style={styles.feather}>🪶</Text>
-            <Text style={styles.title}>Plume Relais</Text>
-            <Text style={styles.subtitle}>Reprends le fil de l'histoire</Text>
+            <Text style={styles.title}>{t.auth.loginTitle}</Text>
+            <Text style={styles.subtitle}>{t.auth.loginSubtitle}</Text>
           </View>
 
-          <View style={styles.card}>
+          <View style={[shared.card, styles.card]}>
             <View style={styles.field}>
-              <Text style={styles.label}>E-mail</Text>
+              <Text style={shared.label}>{t.auth.email}</Text>
               <TextInput
-                style={styles.input}
+                style={shared.input}
                 value={email}
                 onChangeText={setEmail}
-                placeholder="toi@exemple.com"
+                placeholder={t.auth.emailPlaceholder}
                 placeholderTextColor={color.faint}
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -60,12 +66,12 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>Mot de passe</Text>
+              <Text style={shared.label}>{t.auth.password}</Text>
               <TextInput
-                style={styles.input}
+                style={shared.input}
                 value={password}
                 onChangeText={setPassword}
-                placeholder="••••••••"
+                placeholder={t.auth.passwordPlaceholder}
                 placeholderTextColor={color.faint}
                 secureTextEntry
                 returnKeyType="done"
@@ -76,22 +82,22 @@ export default function LoginScreen() {
             {!!error && <Text style={styles.error}>{error}</Text>}
 
             <TouchableOpacity
-              style={[styles.btn, loading && styles.btnDisabled]}
+              style={[shared.btnPrimary, styles.btnMargin, loading && styles.btnDisabled]}
               onPress={handleLogin}
               disabled={loading}
             >
               {loading
                 ? <Spinner size={22} dotColor={color.void} />
-                : <Text style={styles.btnText}>Se connecter</Text>
+                : <Text style={shared.btnPrimaryText}>{t.auth.signIn}</Text>
               }
             </TouchableOpacity>
           </View>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Pas encore de compte ? </Text>
+            <Text style={styles.footerText}>{t.auth.noAccount}</Text>
             <Link href="/(auth)/register" asChild>
               <TouchableOpacity>
-                <Text style={styles.footerLink}>Créer un compte</Text>
+                <Text style={styles.footerLink}>{t.auth.createAccount}</Text>
               </TouchableOpacity>
             </Link>
           </View>
@@ -101,25 +107,21 @@ export default function LoginScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  inner: { flex: 1, justifyContent: 'center', paddingHorizontal: 28, gap: 32 },
-  header: { alignItems: 'center', gap: 8 },
-  feather: { fontSize: 40, marginBottom: 4 },
-  title: { fontFamily: font.display, fontSize: 32, fontWeight: '600', color: color.ink, letterSpacing: 0.3 },
-  subtitle: { fontFamily: font.display, fontStyle: 'italic', fontSize: 15, color: color.muted },
-  card: {
-    ...shared.card,
-    padding: 20, gap: 16,
-  },
-  field: { gap: 8 },
-  label: shared.label,
-  input: shared.input,
-  error: { fontSize: 13, color: color.danger },
-  btn: { ...shared.btnPrimary, marginTop: 4 },
-  btnDisabled: { opacity: 0.6 },
-  btnText: shared.btnPrimaryText,
-  footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-  footerText: { fontSize: 15, color: color.muted },
-  footerLink: { fontSize: 15, color: color.ember, fontWeight: '600' },
-})
+function makeStyles(color: any) {
+  return StyleSheet.create({
+    root: { flex: 1 },
+    inner: { flex: 1, justifyContent: 'center', paddingHorizontal: 28, gap: 32 },
+    header: { alignItems: 'center', gap: 8 },
+    feather: { fontSize: 40, marginBottom: 4 },
+    title: { fontFamily: font.display, fontSize: 32, fontWeight: '600', color: color.ink, letterSpacing: 0.3 },
+    subtitle: { fontFamily: font.display, fontStyle: 'italic', fontSize: 15, color: color.muted },
+    card: { padding: 20, gap: 16 },
+    field: { gap: 8 },
+    error: { fontSize: 13, color: color.danger },
+    btnMargin: { marginTop: 4 },
+    btnDisabled: { opacity: 0.6 },
+    footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+    footerText: { fontSize: 15, color: color.muted },
+    footerLink: { fontSize: 15, color: color.ember, fontWeight: '600' },
+  })
+}

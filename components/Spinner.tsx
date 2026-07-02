@@ -1,13 +1,14 @@
 import { View, StyleSheet } from 'react-native'
 import { useEffect, useRef } from 'react'
 import { Animated, Easing } from 'react-native'
-import { color } from '../constants/theme'
+import { useTheme } from '../contexts/ThemeContext'
 
 // Le loader signature de Plume Relais : douze points disposés en cercle,
-// qui s'éteignent un à un comme des lettres qui s'écrivent — écho direct
-// du loader "coming soon" qui a inspiré ce thème.
+// qui s'éteignent un à un comme des lettres qui s'écrivent.
 
-export default function Spinner({ size = 40, dotColor = color.ember }: { size?: number, dotColor?: string }) {
+export default function Spinner({ size = 40, dotColor }: { size?: number, dotColor?: string }) {
+  const { color } = useTheme()
+  const resolvedColor = dotColor ?? color.ember
   const rotation = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
@@ -44,7 +45,7 @@ export default function Spinner({ size = 40, dotColor = color.ember }: { size?: 
               left: x, top: y,
               width: dotSize, height: dotSize,
               borderRadius: dotSize / 2,
-              backgroundColor: dotColor,
+              backgroundColor: resolvedColor,
               opacity,
             }}
           />

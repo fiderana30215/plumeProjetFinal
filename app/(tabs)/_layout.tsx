@@ -1,7 +1,11 @@
 import { Tabs } from 'expo-router'
-import { color } from '../../constants/theme'
+import { useTheme } from '../../contexts/ThemeContext'
+import { useLanguage } from '../../contexts/LanguageContext'
 
 export default function TabLayout() {
+  const { color } = useTheme()
+  const { t } = useLanguage()
+
   return (
     <Tabs screenOptions={{
       headerShown: false,
@@ -13,9 +17,9 @@ export default function TabLayout() {
         borderTopWidth: 1,
       },
     }}>
-      <Tabs.Screen name="feed" options={{ title: 'Histoires', tabBarIcon: () => null }} />
-      <Tabs.Screen name="create" options={{ title: 'Créer', tabBarIcon: () => null }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profil', tabBarIcon: () => null }} />
+      <Tabs.Screen name="feed" options={{ title: t.tabs.stories, tabBarIcon: () => null }} />
+      <Tabs.Screen name="create" options={{ title: t.tabs.create, tabBarIcon: () => null }} />
+      <Tabs.Screen name="profile" options={{ title: t.tabs.profile, tabBarIcon: () => null }} />
     </Tabs>
   )
 }
