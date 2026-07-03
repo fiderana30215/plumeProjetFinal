@@ -3,6 +3,20 @@ import {
   StyleSheet, ScrollView, Alert, Image,
   Platform, KeyboardAvoidingView,
 } from 'react-native'
+// NB: Alert.alert(title, message, buttons) n'est pas interactif sur
+// react-native-web — les callbacks des boutons ne sont jamais déclenchés.
+// confirmAsync() bascule sur window.confirm sur le web, Alert.alert natif ailleurs.
+function confirmAsync(title: string, message: string): Promise<boolean> {
+  if (Platform.OS === 'web') {
+    return Promise.resolve(typeof window !== 'undefined' ? window.confirm(`${title}\n\n${message}`) : false)
+  }
+  return new Promise((resolve) => {
+    Alert.alert(title, message, [
+      { text: 'Annuler', style: 'cancel', onPress: () => resolve(false) },
+      { text: 'OK', style: 'destructive', onPress: () => resolve(true) },
+    ])
+  })
+}
 import { useState, useEffect, useCallback } from 'react'
 import { router } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
@@ -83,7 +97,8 @@ export default function ProfileEditScreen() {
 
     setUploadingAvatar(true)
     try {
-      const uri = result.assets[0].uri
+      const asset = result.assets[0]
+      const uri = asset.uri
       const response = await fetch(uri)
       const blob = await response.blob()
 
@@ -92,12 +107,22 @@ export default function ProfileEditScreen() {
         return
       }
 
-      const ext = uri.split('.').pop()?.toLowerCase() || 'jpg'
+      // Sur le web, l'URI est un blob: URL sans extension exploitable.
+      // On déduit l'extension du mimeType renvoyé par le picker, avec un
+      // repli sur l'URI uniquement si elle ressemble à un vrai chemin de fichier.
+      const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'heic']
+      const mimeExt = asset.mimeType?.split('/').pop()?.toLowerCase()
+      const looksLikeFilePath = !uri.startsWith('blob:') && !uri.startsWith('data:')
+      const uriExt = looksLikeFilePath ? uri.split('.').pop()?.toLowerCase() : undefined
+      const rawExt = mimeExt || uriExt || 'jpg'
+      const ext = ALLOWED_EXTENSIONS.includes(rawExt) ? (rawExt === 'jpeg' ? 'jpg' : rawExt) : 'jpg'
       const path = `${userId}/avatar.${ext}`
+
+      const contentType = blob.type || (ext === 'jpg' ? 'image/jpeg' : `image/${ext}`)
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(path, blob, { contentType: `image/${ext}`, upsert: true })
+        .upload(path, blob, { contentType, upsert: true })
 
       if (uploadError) {
         Alert.alert(t.common.error, uploadError.message)
@@ -173,16 +198,10 @@ export default function ProfileEditScreen() {
   }
 
   async function handleSignOut() {
-    Alert.alert(t.profile.signOutConfirmTitle, t.profile.signOutConfirmBody, [
-      { text: t.common.cancel, style: 'cancel' },
-      {
-        text: t.profile.signOut, style: 'destructive',
-        onPress: async () => {
-          await signOut()
-          router.replace('/(auth)/login')
-        }
-      }
-    ])
+    const confirmed = await confirmAsync(t.profile.signOutConfirmTitle, t.profile.signOutConfirmBody)
+    if (!confirmed) return
+    await signOut()
+    router.replace('/(auth)/login')
   }
 
   const styles = makeStyles(color)

@@ -1,7 +1,7 @@
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform,
-  Alert, ScrollView,
+  Alert, ScrollView, Image,
 } from 'react-native'
 import { Link, router } from 'expo-router'
 import { useState } from 'react'
@@ -55,8 +55,7 @@ export default function RegisterScreen() {
       <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
-            <Text style={styles.feather}>🪶</Text>
-            <Text style={styles.title}>{t.auth.registerTitle}</Text>
+            <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="cover" />
             <Text style={styles.subtitle}>{t.auth.registerSubtitle}</Text>
           </View>
 
@@ -113,9 +112,11 @@ function makeStyles(color: any) {
   return StyleSheet.create({
     root: { flex: 1 },
     inner: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 28, paddingVertical: 48, gap: 28 },
-    header: { alignItems: 'center', gap: 8 },
-    feather: { fontSize: 40, marginBottom: 4 },
-    title: { fontFamily: font.display, fontSize: 28, fontWeight: '600', color: color.ink },
+    header: { alignItems: 'center', gap: 8,marginTop: -50 },
+    logo: {
+      width: 350, height: 300, borderRadius: 0,
+      marginBottom: 8, borderWidth: 0, borderColor: color.emberBorder,
+    },
     subtitle: { fontFamily: font.display, fontStyle: 'italic', fontSize: 15, color: color.muted },
     card: { padding: 20, gap: 14 },
     field: { gap: 8 },

@@ -1,8 +1,8 @@
-import { View, Image, StyleSheet, ViewStyle } from 'react-native'
+import { View, StyleSheet, ViewStyle } from 'react-native'
 import { useTheme } from '../contexts/ThemeContext'
 
-// Fond commun à tous les écrans : lueur diffuse en haut à gauche, grain de
-// papier par-dessus. S'adapte à la palette sombre ou claire du thème actif.
+// Fond commun à tous les écrans : lueur diffuse en haut à gauche.
+// S'adapte à la palette sombre ou claire du thème actif.
 
 export default function Screen({ children, style }: { children: React.ReactNode, style?: ViewStyle }) {
   const { mode, color } = useTheme()
@@ -15,15 +15,6 @@ export default function Screen({ children, style }: { children: React.ReactNode,
         }]}
         pointerEvents="none"
       />
-      {mode === 'dark' && (
-        <View style={styles.grain} pointerEvents="none">
-          <Image
-            source={require('../assets/grain.png')}
-            style={styles.grainImg}
-            resizeMode="cover"
-          />
-        </View>
-      )}
       <View style={styles.content}>
         {children}
       </View>
@@ -36,13 +27,6 @@ const styles = StyleSheet.create({
   glow: {
     position: 'absolute', top: -120, left: -80,
     width: 420, height: 420, borderRadius: 210,
-  },
-  grain: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-  },
-  grainImg: {
-    width: '100%', height: '100%',
-    opacity: 0.5,
   },
   content: { flex: 1 },
 })

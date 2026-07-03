@@ -10,6 +10,7 @@ export const translations = {
       cancel: 'Annuler',
       save: 'Enregistrer',
       error: 'Erreur',
+      retry: 'Réessayer',
     },
     auth: {
       loginTitle: 'Plume Relais',
@@ -130,6 +131,9 @@ export const translations = {
       english: 'English',
       malagasy: 'Malagasy',
       uploadingAvatar: "Téléversement de l'avatar...",
+      permissionDenied: "Autorise l'accès à tes photos pour changer l'avatar.",
+      avatarTooLarge: 'Image trop lourde (5 Mo maximum).',
+      avatarUploadFailed: "Échec de l'envoi de l'avatar.",
     },
   },
   en: {
@@ -143,6 +147,7 @@ export const translations = {
       cancel: 'Cancel',
       save: 'Save',
       error: 'Error',
+      retry: 'Retry',
     },
     auth: {
       loginTitle: 'Plume Relais',
@@ -263,6 +268,9 @@ export const translations = {
       english: 'English',
       malagasy: 'Malagasy',
       uploadingAvatar: 'Uploading avatar...',
+      permissionDenied: 'Allow photo access to change your avatar.',
+      avatarTooLarge: 'Image too large (5 MB max).',
+      avatarUploadFailed: 'Failed to upload avatar.',
     },
   },
   mg: {
@@ -276,6 +284,7 @@ export const translations = {
       cancel: 'Aoka',
       save: 'Tehirizo',
       error: 'Nisy olana',
+      retry: 'Andramo indray',
     },
     auth: {
       loginTitle: 'Plume Relais',
@@ -396,6 +405,9 @@ export const translations = {
       english: 'English',
       malagasy: 'Malagasy',
       uploadingAvatar: "Mandefa ny sary...",
+      permissionDenied: "Omeo alalana ny sarinao mba hanovana ny avatarao.",
+      avatarTooLarge: 'Be loatra ny sary (5 Mo farafahakeliny).',
+      avatarUploadFailed: 'Tsy nety ny fandefasana ny avatara.',
     },
   },
 }

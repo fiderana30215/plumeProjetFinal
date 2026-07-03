@@ -1,6 +1,6 @@
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, KeyboardAvoidingView, Platform,
+  StyleSheet, KeyboardAvoidingView, Platform, Image,
 } from 'react-native'
 import { Link, router } from 'expo-router'
 import { useState } from 'react'
@@ -45,8 +45,7 @@ export default function LoginScreen() {
       >
         <View style={styles.inner}>
           <View style={styles.header}>
-            <Text style={styles.feather}>🪶</Text>
-            <Text style={styles.title}>{t.auth.loginTitle}</Text>
+            <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="cover" />
             <Text style={styles.subtitle}>{t.auth.loginSubtitle}</Text>
           </View>
 
@@ -111,9 +110,11 @@ function makeStyles(color: any) {
   return StyleSheet.create({
     root: { flex: 1 },
     inner: { flex: 1, justifyContent: 'center', paddingHorizontal: 28, gap: 32 },
-    header: { alignItems: 'center', gap: 8 },
-    feather: { fontSize: 40, marginBottom: 4 },
-    title: { fontFamily: font.display, fontSize: 32, fontWeight: '600', color: color.ink, letterSpacing: 0.3 },
+    header: { alignItems: 'center', gap: 8 ,marginTop: -30},
+    logo: {
+      width: 300, height: 260, borderRadius: 0,
+      marginBottom: 8, borderWidth: 0, borderColor: color.emberBorder,
+    },
     subtitle: { fontFamily: font.display, fontStyle: 'italic', fontSize: 15, color: color.muted },
     card: { padding: 20, gap: 16 },
     field: { gap: 8 },
