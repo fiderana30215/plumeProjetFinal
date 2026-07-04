@@ -50,6 +50,10 @@ export const translations = {
     create: {
       title: 'Nouvelle histoire',
       subtitle: 'Pose la première pierre du récit',
+      coverLabel: 'Couverture',
+      addCover: 'Ajouter une image',
+      changeCover: "Changer l'image",
+      coverUploadFailed: "Échec de l'envoi de l'image.",
       titleLabel: 'Titre',
       titlePlaceholder: 'Le nom de ton histoire',
       openingLabel: 'Ouverture',
@@ -187,6 +191,10 @@ export const translations = {
     create: {
       title: 'New story',
       subtitle: 'Lay the first stone of the tale',
+      coverLabel: 'Cover',
+      addCover: 'Add an image',
+      changeCover: 'Change image',
+      coverUploadFailed: 'Failed to upload image.',
       titleLabel: 'Title',
       titlePlaceholder: 'The name of your story',
       openingLabel: 'Opening',
@@ -324,6 +332,10 @@ export const translations = {
     create: {
       title: 'Tantara vaovao',
       subtitle: "Apetraho ny fototry ny tantara",
+      coverLabel: 'Sary fonony',
+      addCover: 'Manampy sary',
+      changeCover: 'Ovay ny sary',
+      coverUploadFailed: 'Tsy nety ny fandefasana ny sary.',
       titleLabel: 'Lohateny',
       titlePlaceholder: 'Ny anaran\'ny tantaranao',
       openingLabel: 'Fanombohana',

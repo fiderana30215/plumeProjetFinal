@@ -1,6 +1,6 @@
 import {
   View, Text, FlatList, TouchableOpacity,
-  StyleSheet, RefreshControl, Animated,
+  StyleSheet, RefreshControl, Animated, Image,
 } from 'react-native'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { router } from 'expo-router'
@@ -45,18 +45,23 @@ function AnimatedCard({ item, index, onPress, color, t }: {
       marginBottom: 12,
     }}>
       <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
-        <View style={styles.cardTop}>
-          <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
-          <View style={[styles.badge, { backgroundColor: status.dim }]}>
-            <Text style={[styles.badgeText, { color: status.color }]}>{statusText}</Text>
+        {item.cover_url && (
+          <Image source={{ uri: item.cover_url }} style={styles.cardCover} resizeMode="cover" />
+        )}
+        <View style={styles.cardBody}>
+          <View style={styles.cardTop}>
+            <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+            <View style={[styles.badge, { backgroundColor: status.dim }]}>
+              <Text style={[styles.badgeText, { color: status.color }]}>{statusText}</Text>
+            </View>
           </View>
-        </View>
-        <Text style={styles.cardOpening} numberOfLines={2}>{item.opening}</Text>
-        <View style={styles.cardFooter}>
-          <Text style={styles.cardMeta}>
-            {item.mode === 'blind' ? t.feed.blind : t.feed.full}
-          </Text>
-          <Text style={styles.cardMeta}>{t.feed.turn} {item.current_turn}/{item.max_turns}</Text>
+          <Text style={styles.cardOpening} numberOfLines={2}>{item.opening}</Text>
+          <View style={styles.cardFooter}>
+            <Text style={styles.cardMeta}>
+              {item.mode === 'blind' ? t.feed.blind : t.feed.full}
+            </Text>
+            <Text style={styles.cardMeta}>{t.feed.turn} {item.current_turn}/{item.max_turns}</Text>
+          </View>
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -185,8 +190,10 @@ function makeStyles(color: ColorTokens) {
     emptyContainer: { flex: 1 },
     card: {
       backgroundColor: color.surface, borderRadius: radius.lg,
-      borderWidth: 1, borderColor: color.border, padding: 16, gap: 8,
+      borderWidth: 1, borderColor: color.border, overflow: 'hidden',
     },
+    cardCover: { width: '100%', height: 140 },
+    cardBody: { padding: 16, gap: 8 },
     cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
     cardTitle: { fontSize: 17, fontWeight: '600', color: color.ink, flex: 1 },
     badge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill },

@@ -1,10 +1,11 @@
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, Alert, Platform,
-  KeyboardAvoidingView,
+  KeyboardAvoidingView, Image,
 } from 'react-native'
 import { useState } from 'react'
 import { router } from 'expo-router'
+import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/useAuth'
 import Screen from '../../components/Screen'
@@ -12,6 +13,9 @@ import Spinner from '../../components/Spinner'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useLanguage } from '../../contexts/LanguageContext'
 import { font, radius, ColorTokens } from '../../constants/theme'
+
+const MAX_COVER_SIZE_BYTES = 5 * 1024 * 1024 // 5 Mo
+const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'heic']
 
 type Mode = 'full' | 'blind'
 type Visibility = 'public' | 'private'
@@ -29,8 +33,64 @@ export default function CreateStoryScreen() {
   const [turnDuration, setTurnDuration] = useState(60)
   const [submitting, setSubmitting] = useState(false)
 
+  const [coverUrl, setCoverUrl] = useState<string | null>(null)
+  const [uploadingCover, setUploadingCover] = useState(false)
+
   function adjust(setter: (v: number) => void, value: number, delta: number, min: number, max: number) {
     setter(Math.min(max, Math.max(min, value + delta)))
+  }
+
+  async function pickCover() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!permission.granted) return
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [3, 4],
+      quality: 0.7,
+    })
+    if (result.canceled || !result.assets?.[0]?.uri || !userId) return
+
+    setUploadingCover(true)
+    try {
+      const asset = result.assets[0]
+      const uri = asset.uri
+      const response = await fetch(uri)
+      const blob = await response.blob()
+
+      if (blob.size > MAX_COVER_SIZE_BYTES) {
+        Alert.alert(t.common.error, t.profileEdit.avatarTooLarge ?? t.common.error)
+        return
+      }
+
+      // Sur le web, l'URI est un blob: URL sans extension exploitable :
+      // on déduit l'extension du mimeType renvoyé par le picker plutôt
+      // que de parser l'URI (même logique que profile-edit.tsx).
+      const mimeExt = asset.mimeType?.split('/').pop()?.toLowerCase()
+      const looksLikeFilePath = !uri.startsWith('blob:') && !uri.startsWith('data:')
+      const uriExt = looksLikeFilePath ? uri.split('.').pop()?.toLowerCase() : undefined
+      const rawExt = mimeExt || uriExt || 'jpg'
+      const ext = ALLOWED_EXTENSIONS.includes(rawExt) ? (rawExt === 'jpeg' ? 'jpg' : rawExt) : 'jpg'
+      const path = `${userId}/${Date.now()}.${ext}`
+      const contentType = blob.type || (ext === 'jpg' ? 'image/jpeg' : `image/${ext}`)
+
+      const { error: uploadError } = await supabase.storage
+        .from('covers')
+        .upload(path, blob, { contentType, upsert: true })
+
+      if (uploadError) {
+        Alert.alert(t.common.error, uploadError.message)
+        return
+      }
+
+      const { data: publicUrlData } = supabase.storage.from('covers').getPublicUrl(path)
+      setCoverUrl(`${publicUrlData.publicUrl}?t=${Date.now()}`)
+    } catch {
+      Alert.alert(t.common.error, t.create.coverUploadFailed)
+    } finally {
+      setUploadingCover(false)
+    }
   }
 
   async function handleCreate() {
@@ -44,7 +104,8 @@ export default function CreateStoryScreen() {
     }
 
     setSubmitting(true)
-    const { data, error } = await (supabase.from('stories') as any)
+    const { data, error } = await supabase
+      .from('stories')
       .insert([{
         title: title.trim(),
         opening: opening.trim(),
@@ -53,6 +114,7 @@ export default function CreateStoryScreen() {
         turn_duration: turnDuration,
         visibility,
         owner_id: userId,
+        cover_url: coverUrl,
       }])
       .select()
       .single()
@@ -69,6 +131,7 @@ export default function CreateStoryScreen() {
     setVisibility('public')
     setMaxTurns(10)
     setTurnDuration(60)
+    setCoverUrl(null)
 
     router.replace(`/story/${data.id}` as any)
   }
@@ -86,6 +149,36 @@ export default function CreateStoryScreen() {
           </View>
 
           <View style={[shared.card, styles.card]}>
+            <View style={styles.field}>
+              <Text style={shared.label}>{t.create.coverLabel}</Text>
+              <TouchableOpacity
+                style={styles.coverPicker}
+                onPress={pickCover}
+                disabled={uploadingCover}
+                accessibilityRole="button"
+                accessibilityLabel={coverUrl ? t.create.changeCover : t.create.addCover}
+              >
+                {coverUrl ? (
+                  <Image source={{ uri: coverUrl }} style={styles.coverImg} resizeMode="cover" />
+                ) : (
+                  <View style={styles.coverPlaceholder}>
+                    <Text style={styles.coverPlaceholderIcon}>🖼️</Text>
+                    <Text style={styles.coverPlaceholderText}>{t.create.addCover}</Text>
+                  </View>
+                )}
+                {uploadingCover && (
+                  <View style={styles.coverOverlay}>
+                    <Spinner size={26} dotColor={color.ink} />
+                  </View>
+                )}
+                {!!coverUrl && !uploadingCover && (
+                  <View style={styles.coverChangeBadge}>
+                    <Text style={styles.coverChangeBadgeText}>{t.create.changeCover}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+
             <View style={styles.field}>
               <Text style={shared.label}>{t.create.titleLabel}</Text>
               <TextInput
@@ -203,6 +296,31 @@ function makeStyles(color: ColorTokens) {
 
     card: { padding: 20, gap: 18 },
     field: { gap: 8 },
+
+    coverPicker: {
+      width: '100%', aspectRatio: 3 / 4, maxHeight: 220,
+      borderRadius: radius.md, overflow: 'hidden',
+    },
+    coverImg: { width: '100%', height: '100%' },
+    coverPlaceholder: {
+      flex: 1, borderWidth: 1, borderColor: color.border, borderStyle: 'dashed',
+      borderRadius: radius.md, backgroundColor: color.surface,
+      alignItems: 'center', justifyContent: 'center', gap: 6,
+    },
+    coverPlaceholderIcon: { fontSize: 28 },
+    coverPlaceholderText: { fontSize: 14, color: color.muted, fontWeight: '500' },
+    coverOverlay: {
+      position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      alignItems: 'center', justifyContent: 'center',
+    },
+    coverChangeBadge: {
+      position: 'absolute', bottom: 8, right: 8,
+      backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: radius.pill,
+      paddingHorizontal: 10, paddingVertical: 5,
+    },
+    coverChangeBadgeText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+
     editor: {
       borderWidth: 1, borderColor: color.border, borderRadius: radius.md,
       padding: 16, fontSize: 16, color: color.ink,
