@@ -22,6 +22,7 @@ import { router } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
+import { uploadImageToStorage, resolveExtension } from '../lib/uploadImage'
 import { useAuth, signOut } from '../lib/useAuth'
 import Screen from '../components/Screen'
 import Spinner from '../components/Spinner'
@@ -99,33 +100,24 @@ export default function ProfileEditScreen() {
     try {
       const asset = result.assets[0]
       const uri = asset.uri
-      const response = await fetch(uri)
-      const blob = await response.blob()
+      const ext = resolveExtension(uri, asset.mimeType)
+      const path = `${userId}/avatar.${ext}`
+      const contentType = asset.mimeType || (ext === 'jpg' ? 'image/jpeg' : `image/${ext}`)
 
-      if (blob.size > MAX_AVATAR_SIZE_BYTES) {
+      const { error: uploadError, tooLarge } = await uploadImageToStorage({
+        bucket: 'avatars',
+        path,
+        uri,
+        mimeType: contentType,
+        maxSizeBytes: MAX_AVATAR_SIZE_BYTES,
+      })
+
+      if (tooLarge) {
         Alert.alert(t.common.error, t.profileEdit.avatarTooLarge ?? t.common.error)
         return
       }
-
-      // Sur le web, l'URI est un blob: URL sans extension exploitable.
-      // On déduit l'extension du mimeType renvoyé par le picker, avec un
-      // repli sur l'URI uniquement si elle ressemble à un vrai chemin de fichier.
-      const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'heic']
-      const mimeExt = asset.mimeType?.split('/').pop()?.toLowerCase()
-      const looksLikeFilePath = !uri.startsWith('blob:') && !uri.startsWith('data:')
-      const uriExt = looksLikeFilePath ? uri.split('.').pop()?.toLowerCase() : undefined
-      const rawExt = mimeExt || uriExt || 'jpg'
-      const ext = ALLOWED_EXTENSIONS.includes(rawExt) ? (rawExt === 'jpeg' ? 'jpg' : rawExt) : 'jpg'
-      const path = `${userId}/avatar.${ext}`
-
-      const contentType = blob.type || (ext === 'jpg' ? 'image/jpeg' : `image/${ext}`)
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(path, blob, { contentType, upsert: true })
-
       if (uploadError) {
-        Alert.alert(t.common.error, uploadError.message)
+        Alert.alert(t.common.error, uploadError)
         return
       }
 

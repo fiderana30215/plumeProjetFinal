@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { router } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../../lib/supabase'
+import { uploadImageToStorage, resolveExtension } from '../../lib/uploadImage'
 import { useAuth } from '../../lib/useAuth'
 import Screen from '../../components/Screen'
 import Spinner from '../../components/Spinner'
@@ -15,7 +16,6 @@ import { useLanguage } from '../../contexts/LanguageContext'
 import { font, radius, ColorTokens } from '../../constants/theme'
 
 const MAX_COVER_SIZE_BYTES = 5 * 1024 * 1024 // 5 Mo
-const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'heic']
 
 type Mode = 'full' | 'blind'
 type Visibility = 'public' | 'private'
@@ -56,31 +56,24 @@ export default function CreateStoryScreen() {
     try {
       const asset = result.assets[0]
       const uri = asset.uri
-      const response = await fetch(uri)
-      const blob = await response.blob()
+      const ext = resolveExtension(uri, asset.mimeType)
+      const path = `${userId}/${Date.now()}.${ext}`
+      const contentType = asset.mimeType || (ext === 'jpg' ? 'image/jpeg' : `image/${ext}`)
 
-      if (blob.size > MAX_COVER_SIZE_BYTES) {
+      const { error: uploadError, tooLarge } = await uploadImageToStorage({
+        bucket: 'covers',
+        path,
+        uri,
+        mimeType: contentType,
+        maxSizeBytes: MAX_COVER_SIZE_BYTES,
+      })
+
+      if (tooLarge) {
         Alert.alert(t.common.error, t.profileEdit.avatarTooLarge ?? t.common.error)
         return
       }
-
-      // Sur le web, l'URI est un blob: URL sans extension exploitable :
-      // on déduit l'extension du mimeType renvoyé par le picker plutôt
-      // que de parser l'URI (même logique que profile-edit.tsx).
-      const mimeExt = asset.mimeType?.split('/').pop()?.toLowerCase()
-      const looksLikeFilePath = !uri.startsWith('blob:') && !uri.startsWith('data:')
-      const uriExt = looksLikeFilePath ? uri.split('.').pop()?.toLowerCase() : undefined
-      const rawExt = mimeExt || uriExt || 'jpg'
-      const ext = ALLOWED_EXTENSIONS.includes(rawExt) ? (rawExt === 'jpeg' ? 'jpg' : rawExt) : 'jpg'
-      const path = `${userId}/${Date.now()}.${ext}`
-      const contentType = blob.type || (ext === 'jpg' ? 'image/jpeg' : `image/${ext}`)
-
-      const { error: uploadError } = await supabase.storage
-        .from('covers')
-        .upload(path, blob, { contentType, upsert: true })
-
       if (uploadError) {
-        Alert.alert(t.common.error, uploadError.message)
+        Alert.alert(t.common.error, uploadError)
         return
       }
 
