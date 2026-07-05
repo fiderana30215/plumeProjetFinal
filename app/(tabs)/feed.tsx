@@ -1,16 +1,20 @@
 import {
   View, Text, FlatList, TouchableOpacity,
-  StyleSheet, RefreshControl, Animated, Image,
+  StyleSheet, RefreshControl, Animated, Image, TextInput,
 } from 'react-native'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { router } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import LoadingScreen from '../../components/LoadingScreen'
 import Screen from '../../components/Screen'
-import type { StoryRow } from '../../types/database'
+import Spinner from '../../components/Spinner'
+import type { StoryRow, UserRow } from '../../types/database'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useLanguage } from '../../contexts/LanguageContext'
 import { font, radius, statusLabel, ColorTokens } from '../../constants/theme'
+
+const SEARCH_DEBOUNCE_MS = 350
+const SEARCH_RESULT_LIMIT = 8
 
 function AnimatedCard({ item, index, onPress, color, t }: {
   item: StoryRow, index: number, onPress: () => void, color: ColorTokens, t: any,
@@ -100,6 +104,12 @@ export default function FeedScreen() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
+  const [query, setQuery] = useState('')
+  const [searching, setSearching] = useState(false)
+  const [storyResults, setStoryResults] = useState<StoryRow[]>([])
+  const [userResults, setUserResults] = useState<UserRow[]>([])
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   async function fetchStories() {
     const { data, error } = await supabase
       .from('stories')
@@ -121,6 +131,47 @@ export default function FeedScreen() {
     return () => { supabase.removeChannel(channel) }
   }, [])
 
+  // Recherche débouncée : dès que l'utilisateur tape, on attend qu'il
+  // s'arrête (350ms) avant d'interroger Supabase, pour ne pas spammer
+  // une requête à chaque frappe.
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+
+    const q = query.trim()
+    if (q.length === 0) {
+      setStoryResults([])
+      setUserResults([])
+      setSearching(false)
+      return
+    }
+
+    setSearching(true)
+    debounceRef.current = setTimeout(async () => {
+      const escaped = q.replace(/[%_]/g, '\\$&')
+      const [{ data: storiesData }, { data: usersData }] = await Promise.all([
+        supabase
+          .from('stories')
+          .select('*')
+          .eq('visibility', 'public')
+          .or(`title.ilike.%${escaped}%,opening.ilike.%${escaped}%`)
+          .order('created_at', { ascending: false })
+          .limit(SEARCH_RESULT_LIMIT),
+        supabase
+          .from('users')
+          .select('*')
+          .ilike('pseudo', `%${escaped}%`)
+          .limit(SEARCH_RESULT_LIMIT),
+      ])
+      setStoryResults((storiesData as StoryRow[]) ?? [])
+      setUserResults((usersData as UserRow[]) ?? [])
+      setSearching(false)
+    }, SEARCH_DEBOUNCE_MS)
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [query])
+
   const onRefresh = useCallback(() => {
     setRefreshing(true)
     fetchStories()
@@ -129,6 +180,8 @@ export default function FeedScreen() {
   if (loading) return <LoadingScreen />
 
   const styles = makeStyles(color)
+  const isSearchMode = query.trim().length > 0
+  const hasResults = storyResults.length > 0 || userResults.length > 0
 
   return (
     <Screen>
@@ -136,40 +189,119 @@ export default function FeedScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>{t.feed.title}</Text>
           <Text style={styles.subtitle}>{t.feed.subtitle}</Text>
+
+          <View style={styles.searchBar}>
+            <Text style={styles.searchIcon}>🔍</Text>
+            <TextInput
+              style={styles.searchInput}
+              value={query}
+              onChangeText={setQuery}
+              placeholder={t.search.placeholder}
+              placeholderTextColor={color.faint}
+              autoCapitalize="none"
+              returnKeyType="search"
+            />
+            {searching && <Spinner size={16} dotColor={color.ember} />}
+            {!!query && !searching && (
+              <TouchableOpacity onPress={() => setQuery('')} hitSlop={8}>
+                <Text style={styles.searchClear}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
-        <FlatList
-          data={stories}
-          keyExtractor={(item) => item.id}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={color.ember} />
-          }
-          contentContainerStyle={stories.length === 0 ? styles.emptyContainer : styles.list}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>🪶</Text>
-              <Text style={styles.emptyText}>{t.feed.empty}</Text>
-              <TouchableOpacity
-                style={styles.emptyBtn}
-                onPress={() => router.push('/(tabs)/create')}
-              >
-                <Text style={styles.emptyBtnText}>{t.feed.createFirst}</Text>
-              </TouchableOpacity>
-            </View>
-          }
-          renderItem={({ item, index }) => (
-            <AnimatedCard
-              item={item as StoryRow}
-              index={index}
-              color={color}
-              t={t}
-              onPress={() => router.push({
-                pathname: '/story/[id]',
-                params: { id: item.id }
-              } as any)}
-            />
-          )}
-        />
+        {isSearchMode ? (
+          <FlatList
+            data={[]}
+            keyExtractor={() => 'search'}
+            renderItem={null}
+            contentContainerStyle={styles.searchResults}
+            ListHeaderComponent={
+              <View>
+                {!searching && !hasResults && (
+                  <Text style={styles.searchEmpty}>{t.search.noResults}</Text>
+                )}
+
+                {userResults.length > 0 && (
+                  <View style={styles.searchSection}>
+                    <Text style={styles.searchSectionTitle}>{t.search.sectionProfiles}</Text>
+                    {userResults.map((u) => (
+                      <TouchableOpacity
+                        key={u.id}
+                        style={styles.userRow}
+                        onPress={() => router.push(`/user/${u.id}` as any)}
+                        activeOpacity={0.8}
+                      >
+                        {u.avatar_url ? (
+                          <Image source={{ uri: u.avatar_url }} style={styles.userAvatarImg} />
+                        ) : (
+                          <View style={styles.userAvatar}>
+                            <Text style={styles.userAvatarText}>
+                              {u.pseudo?.charAt(0).toUpperCase() ?? '?'}
+                            </Text>
+                          </View>
+                        )}
+                        <Text style={styles.userPseudo} numberOfLines={1}>{u.pseudo}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {storyResults.length > 0 && (
+                  <View style={styles.searchSection}>
+                    <Text style={styles.searchSectionTitle}>{t.search.sectionStories}</Text>
+                    {storyResults.map((item, index) => (
+                      <AnimatedCard
+                        key={item.id}
+                        item={item}
+                        index={index}
+                        color={color}
+                        t={t}
+                        onPress={() => router.push({
+                          pathname: '/story/[id]',
+                          params: { id: item.id }
+                        } as any)}
+                      />
+                    ))}
+                  </View>
+                )}
+              </View>
+            }
+          />
+        ) : (
+          <FlatList
+            data={stories}
+            keyExtractor={(item) => item.id}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={color.ember} />
+            }
+            contentContainerStyle={stories.length === 0 ? styles.emptyContainer : styles.list}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <Text style={styles.emptyIcon}>🪶</Text>
+                <Text style={styles.emptyText}>{t.feed.empty}</Text>
+                <TouchableOpacity
+                  style={styles.emptyBtn}
+                  onPress={() => router.push('/(tabs)/create')}
+                >
+                  <Text style={styles.emptyBtnText}>{t.feed.createFirst}</Text>
+                </TouchableOpacity>
+              </View>
+            }
+            renderItem={({ item, index }) => (
+              <AnimatedCard
+                item={item as StoryRow}
+                index={index}
+                color={color}
+                t={t}
+                onPress={() => router.push({
+                  pathname: '/story/[id]',
+                  params: { id: item.id }
+                } as any)}
+              />
+            )}
+          />
+        )}
 
         <FABButton color={color} onPress={() => router.push('/(tabs)/create')} />
       </View>
@@ -182,10 +314,42 @@ function makeStyles(color: ColorTokens) {
     root: { flex: 1 },
     header: {
       paddingTop: 60, paddingHorizontal: 24, paddingBottom: 16,
-      borderBottomWidth: 1, borderBottomColor: color.border,
+      borderBottomWidth: 1, borderBottomColor: color.border, gap: 12,
     },
     title: { fontFamily: font.display, fontSize: 28, fontWeight: '600', color: color.ink },
     subtitle: { fontFamily: font.display, fontStyle: 'italic', fontSize: 14, color: color.muted, marginTop: 2 },
+
+    searchBar: {
+      flexDirection: 'row', alignItems: 'center', gap: 8,
+      borderWidth: 1, borderColor: color.border, borderRadius: radius.pill,
+      backgroundColor: color.surface, paddingHorizontal: 14, height: 44,
+    },
+    searchIcon: { fontSize: 14 },
+    searchInput: { flex: 1, fontSize: 15, color: color.ink, height: '100%' },
+    searchClear: { fontSize: 14, color: color.faint, padding: 4 },
+
+    searchResults: { padding: 16, paddingBottom: 100 },
+    searchEmpty: { textAlign: 'center', fontSize: 15, color: color.muted, paddingTop: 40 },
+    searchSection: { marginBottom: 20 },
+    searchSectionTitle: {
+      fontSize: 13, fontWeight: '700', color: color.faint,
+      textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10,
+    },
+    userRow: {
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      paddingVertical: 10, paddingHorizontal: 12,
+      backgroundColor: color.surface, borderRadius: radius.md,
+      borderWidth: 1, borderColor: color.border, marginBottom: 8,
+    },
+    userAvatar: {
+      width: 40, height: 40, borderRadius: 20,
+      backgroundColor: color.emberDim, borderWidth: 1, borderColor: color.emberBorder,
+      justifyContent: 'center', alignItems: 'center',
+    },
+    userAvatarImg: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: color.emberBorder },
+    userAvatarText: { fontSize: 16, color: color.ember, fontWeight: '600', fontFamily: font.display },
+    userPseudo: { fontSize: 15, color: color.ink, fontWeight: '600', flex: 1 },
+
     list: { padding: 16 },
     emptyContainer: { flex: 1 },
     card: {

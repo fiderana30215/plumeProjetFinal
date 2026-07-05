@@ -116,6 +116,16 @@ export const translations = {
       statusInProgress: 'En cours',
       statusFinished: 'Terminé',
     },
+    search: {
+      placeholder: 'Chercher une histoire ou un pseudo...',
+      noResults: 'Aucun résultat.',
+      sectionStories: 'Histoires',
+      sectionProfiles: 'Profils',
+    },
+    userProfile: {
+      storiesTitle: 'Histoires publiées',
+      empty: "Cette personne n'a pas encore publié d'histoire publique.",
+    },
     profileEdit: {
       title: 'Modifier le profil',
       changeAvatar: "Changer l'avatar",
@@ -257,6 +267,16 @@ export const translations = {
       statusInProgress: 'In progress',
       statusFinished: 'Finished',
     },
+    search: {
+      placeholder: 'Search a story or username...',
+      noResults: 'No results.',
+      sectionStories: 'Stories',
+      sectionProfiles: 'Profiles',
+    },
+    userProfile: {
+      storiesTitle: 'Published stories',
+      empty: "This person hasn't published a public story yet.",
+    },
     profileEdit: {
       title: 'Edit profile',
       changeAvatar: 'Change avatar',
@@ -397,6 +417,16 @@ export const translations = {
       statusOpen: 'Misokatra',
       statusInProgress: 'Mandeha',
       statusFinished: 'Vita',
+    },
+    search: {
+      placeholder: 'Katsaho tantara na anarana...',
+      noResults: 'Tsy nisy hita.',
+      sectionStories: 'Tantara',
+      sectionProfiles: 'Mombamomba',
+    },
+    userProfile: {
+      storiesTitle: 'Tantara navoaka',
+      empty: 'Mbola tsy nanavoaka tantara ho an\'ny besinimaro io olona io.',
     },
     profileEdit: {
       title: 'Ovay ny mombamomba',

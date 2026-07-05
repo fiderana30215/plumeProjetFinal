@@ -1,21 +1,30 @@
 {
   "expo": {
-    "name": "plume-relais",
+    "name": "Plume Relais",
     "slug": "plume-relais",
     "scheme": "plume-relais",
-        "splash": {
-      "image": "./assets/logo.png",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#0A0908"
     },
-        "android": {
+    "android": {
+      "package": "com.fiderana.plumerelais",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/logo.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A0908"
       }
     },
-        "web": {
-      "favicon": "./assets/logo.png"
+    "ios": {
+      "bundleIdentifier": "com.fiderana.plumerelais",
+      "buildNumber": "1"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
     },
     "extra": {
       "supabaseUrl": "https://aokixfzzocxhkrkpszax.supabase.co",
