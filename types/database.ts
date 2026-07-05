@@ -125,7 +125,16 @@ export interface Database {
       }
     }
     Views: {}
-    Functions: {}
+    Functions: {
+      cast_vote: {
+        Args: {
+          p_contribution_id: string
+          p_story_id: string
+          p_turn_number: number
+        }
+        Returns: undefined
+      }
+    }
     Enums: {}
     CompositeTypes: {}
   }

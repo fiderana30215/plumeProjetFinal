@@ -150,17 +150,16 @@ export default function StoryScreen() {
     }
 
     setVoting(contributionId)
-    const { error } = await supabase.from('votes').insert([{
-      contribution_id: contributionId,
-      user_id: userId,
-      story_id: id,
-      turn_number: story.current_turn,
-    }] as any)
+    // Vote atomique côté base de données (insertion + incrémentation du
+    // compteur dans la même transaction) : évite les compteurs faux qui
+    // survenaient avec un update séparé basé sur l'état local.
+    const { error } = await supabase.rpc('cast_vote', {
+      p_contribution_id: contributionId,
+      p_story_id: id,
+      p_turn_number: story.current_turn,
+    })
 
     if (!error) {
-      await (supabase.from('contributions') as any)
-        .update({ vote_count: (proposals.find(p => p.id === contributionId)?.vote_count ?? 0) + 1 })
-        .eq('id', contributionId)
       setMyVote(contributionId)
       await sendLocalNotification(
         'Vote enregistré ✅',
