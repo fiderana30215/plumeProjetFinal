@@ -174,10 +174,7 @@ export default function ProfileScreen() {
           })
         )}
 
-        {/* Bouton déconnexion */}
-        <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
-          <Text style={styles.signOutText}>{t.profile.signOut}</Text>
-        </TouchableOpacity>
+       
 
       </ScrollView>
     </Screen>
