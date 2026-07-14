@@ -96,6 +96,8 @@ export const translations = {
       forbiddenTitle: 'Interdit',
       forbiddenBody: 'Tu ne peux pas voter pour ta propre proposition.',
       notFound: 'Histoire introuvable.',
+      closeTurn: 'Clôturer ce tour',
+      closeTurnFinish: "Clôturer et terminer l'histoire",
     },
     profile: {
       pointsLabel: 'Points',
@@ -247,6 +249,8 @@ export const translations = {
       forbiddenTitle: 'Not allowed',
       forbiddenBody: "You can't vote for your own proposal.",
       notFound: 'Story not found.',
+      closeTurn: 'Close this turn',
+      closeTurnFinish: 'Close and finish the story',
     },
     profile: {
       pointsLabel: 'Points',
@@ -398,6 +402,8 @@ export const translations = {
       forbiddenTitle: 'Voarara',
       forbiddenBody: 'Tsy afaka mifidy ny tolotrao ianao.',
       notFound: 'Tsy hita ny tantara.',
+      closeTurn: 'Fintino ity tolotra ity',
+      closeTurnFinish: 'Fintino sy vitao ny tantara',
     },
     profile: {
       pointsLabel: 'Isa',

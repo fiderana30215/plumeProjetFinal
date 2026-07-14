@@ -23,7 +23,7 @@ function AnimatedCard({ item, index, onPress, color, t }: {
   const slideAnim = useRef(new Animated.Value(30)).current
 
   useEffect(() => {
-    Animated.parallel([
+    const anim = Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1, duration: 400,
         delay: index * 80, useNativeDriver: false,
@@ -32,7 +32,13 @@ function AnimatedCard({ item, index, onPress, color, t }: {
         toValue: 0, duration: 400,
         delay: index * 80, useNativeDriver: false,
       }),
-    ]).start()
+    ])
+    anim.start()
+    // Annule l'animation si le composant se démonte pendant qu'elle tourne
+    // (ex: la liste se re-render suite à une mise à jour temps réel) —
+    // sans ça, l'animation continue d'essayer d'agir sur un nœud DOM
+    // retiré, ce qui déclenche des erreurs "removeChild" en cascade sur web.
+    return () => anim.stop()
   }, [])
 
   const status = statusLabel(item.status, color)
@@ -77,10 +83,12 @@ function FABButton({ onPress, color }: { onPress: () => void, color: ColorTokens
   const slideAnim = useRef(new Animated.Value(30)).current
 
   useEffect(() => {
-    Animated.parallel([
+    const anim = Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 400, delay: 300, useNativeDriver: false }),
       Animated.timing(slideAnim, { toValue: 0, duration: 400, delay: 300, useNativeDriver: false }),
-    ]).start()
+    ])
+    anim.start()
+    return () => anim.stop()
   }, [])
 
   const styles = makeStyles(color)

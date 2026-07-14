@@ -134,6 +134,12 @@ export interface Database {
         }
         Returns: undefined
       }
+      close_turn: {
+        Args: {
+          p_story_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {}
     CompositeTypes: {}

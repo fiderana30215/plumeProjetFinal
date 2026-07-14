@@ -34,12 +34,14 @@ export default function StoryScreen() {
 
   const [story, setStory] = useState<StoryRow | null>(null)
   const [contributions, setContributions] = useState<ContributionRow[]>([])
+  const [authors, setAuthors] = useState<Record<string, string>>({})
   const [proposals, setProposals] = useState<ContributionRow[]>([])
   const [newParagraph, setNewParagraph] = useState('')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [voting, setVoting] = useState<string | null>(null)
   const [myVote, setMyVote] = useState<string | null>(null)
+  const [closingTurn, setClosingTurn] = useState(false)
   const [tab, setTab] = useState<Tab>('story')
 
   const scaleAnim = useRef(new Animated.Value(1)).current
@@ -47,9 +49,11 @@ export default function StoryScreen() {
 
   useEffect(() => {
     fadeAnim.setValue(0)
-    Animated.timing(fadeAnim, {
+    const anim = Animated.timing(fadeAnim, {
       toValue: 1, duration: 400, useNativeDriver: false,
-    }).start()
+    })
+    anim.start()
+    return () => anim.stop()
   }, [tab])
 
   async function fetchAll() {
@@ -63,11 +67,21 @@ export default function StoryScreen() {
       .from('contributions').select('*')
       .eq('story_id', id).eq('is_canon', true)
       .order('turn_number', { ascending: true })
-    if (canonData) setContributions(canonData as ContributionRow[])
+    if (canonData) {
+      setContributions(canonData as ContributionRow[])
+      const authorIds = [...new Set((canonData as ContributionRow[]).map(c => c.user_id))]
+      if (authorIds.length > 0) {
+        const { data: authorsData } = await supabase
+          .from('users').select('id, pseudo').in('id', authorIds)
+        if (authorsData) {
+          setAuthors(Object.fromEntries(authorsData.map((a: any) => [a.id, a.pseudo])))
+        }
+      }
+    }
 
     const { data: proposalData } = await supabase
       .from('contributions').select('*')
-      .eq('story_id', id).eq('is_canon', false)
+      .eq('story_id', id).eq('is_canon', false).eq('turn_number', (storyData as any)?.current_turn ?? 1)
       .order('vote_count', { ascending: false })
     if (proposalData) setProposals(proposalData as ContributionRow[])
 
@@ -173,6 +187,26 @@ export default function StoryScreen() {
     fetchAll()
   }
 
+  async function handleCloseTurn() {
+    if (!story || !id) return
+    setClosingTurn(true)
+    const { error } = await supabase.rpc('close_turn', { p_story_id: id })
+    setClosingTurn(false)
+
+    if (error) {
+      Alert.alert(t.common.error, error.message)
+      return
+    }
+
+    setMyVote(null)
+    setTab('story')
+    await sendLocalNotification(
+      'Tour clôturé 📖',
+      'Le paragraphe gagnant a rejoint l\'histoire officielle.'
+    )
+    fetchAll()
+  }
+
   if (loading) return <LoadingScreen />
 
   const styles = makeStyles(color)
@@ -237,7 +271,10 @@ export default function StoryScreen() {
               </View>
               {contributions.map((c) => (
                 <View key={c.id} style={styles.paragraph}>
-                  <Text style={styles.paragraphLabel}>{t.story.turn} {c.turn_number}</Text>
+                  <View style={styles.paragraphHeader}>
+                    <Text style={styles.paragraphLabel}>{t.story.turn} {c.turn_number}</Text>
+                    <Text style={styles.paragraphAuthor}>{authors[c.user_id] ?? '—'}</Text>
+                  </View>
                   <Text style={styles.paragraphText}>{c.content}</Text>
                 </View>
               ))}
@@ -343,6 +380,23 @@ export default function StoryScreen() {
                   )
                 })
               )}
+
+              {userId === story.owner_id && story.status !== 'finished' && (
+                <TouchableOpacity
+                  style={[styles.closeTurnBtn, (closingTurn || proposals.length === 0) && styles.btnDisabled]}
+                  onPress={handleCloseTurn}
+                  disabled={closingTurn || proposals.length === 0}
+                >
+                  {closingTurn
+                    ? <Spinner size={18} dotColor={color.void} />
+                    : <Text style={styles.closeTurnBtnText}>
+                        {story.current_turn >= story.max_turns
+                          ? t.story.closeTurnFinish
+                          : t.story.closeTurn}
+                      </Text>
+                  }
+                </TouchableOpacity>
+              )}
             </>
           )}
         </Animated.ScrollView>
@@ -383,6 +437,8 @@ function makeStyles(color: ColorTokens) {
       fontSize: 12, color: color.ember, fontWeight: '600',
       textTransform: 'uppercase', letterSpacing: 0.8,
     },
+    paragraphHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    paragraphAuthor: { fontSize: 12, color: color.faint, fontStyle: 'italic' },
     paragraphText: { fontSize: 16, color: color.ink, lineHeight: 26 },
 
     blindWarning: { backgroundColor: color.warningDim, borderRadius: radius.sm, padding: 12 },
@@ -420,6 +476,12 @@ function makeStyles(color: ColorTokens) {
     voteBtnText: { color: color.void, fontSize: 13, fontWeight: '700' },
     myProposalTag: { fontSize: 12, color: color.muted, fontStyle: 'italic' },
     myVoteTag: { fontSize: 12, color: color.ember, fontWeight: '600' },
+
+    closeTurnBtn: {
+      marginTop: 8, height: 48, borderRadius: radius.md,
+      backgroundColor: color.ember, alignItems: 'center', justifyContent: 'center',
+    },
+    closeTurnBtnText: { color: color.void, fontSize: 15, fontWeight: '700' },
 
     muted: { fontSize: 15, color: color.muted, textAlign: 'center', paddingVertical: 24 },
   })
